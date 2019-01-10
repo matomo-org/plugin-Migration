@@ -26,6 +26,7 @@ Optional parameters are:
  --skip-logs
  --skip-archives
  --dry-run
+ --disable-db-transactions
 ```
 
 Please note that the migration can take a while depending on the amount of data that needs to be copied.

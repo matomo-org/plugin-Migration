@@ -41,6 +41,7 @@ class Migrate extends ConsoleCommand
         $this->addOption('skip-logs', null, InputOption::VALUE_NONE, 'Skip migration of logs');
         $this->addOption('skip-archives', null, InputOption::VALUE_NONE, 'Skip migration of archives');
         $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Enable debug mode where it does not insert anything.');
+        $this->addOption('disable-db-transactions', null, InputOption::VALUE_NONE, 'Disable the usage of MySQL database transactions');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -50,6 +51,10 @@ class Migrate extends ConsoleCommand
 
         $this->checkSiteExists($idSite);
         $targetDb = $this->makeTargetDb($input);
+
+        if ($input->getOption('disable-db-transactions')) {
+            $targetDb->disableTransactions();
+        }
 
         if ($input->getOption('dry-run')) {
             $output->writeln('Dry run is enabled. No entries will be written on the target DB.');

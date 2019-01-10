@@ -25,11 +25,18 @@ class TargetDb
 
     private $dryRun = false;
 
+    private $useTransactions = true;
+
     public function __construct($config)
     {
         $this->config = array_merge(Db::getDatabaseConfig(), $config);
         $this->db = $this->testConnection($this->config);
         return $this->db;
+    }
+
+    public function disableTransactions()
+    {
+        $this->useTransactions = false;
     }
 
     public function enableDryRun()
@@ -39,17 +46,23 @@ class TargetDb
 
     public function beginTransaction()
     {
-        $this->db->beginTransaction();
+        if ($this->useTransactions) {
+            $this->db->beginTransaction();
+        }
     }
 
     public function rollBack()
     {
-        $this->db->rollBack();
+        if ($this->useTransactions) {
+            $this->db->rollBack();
+        }
     }
 
     public function commit()
     {
-        $this->db->commit();
+        if ($this->useTransactions) {
+            $this->db->commit();
+        }
     }
 
     public function fetchRow($sql, $bind = array(), $fetchMode = null)
