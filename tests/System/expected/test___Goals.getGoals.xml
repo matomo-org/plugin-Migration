@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<result>
+	<row key="1">
+		<idsite>1</idsite>
+		<idgoal>1</idgoal>
+		<name>Download Software</name>
+		<description />
+		<match_attribute>url</match_attribute>
+		<pattern>download</pattern>
+		<pattern_type>contains</pattern_type>
+		<case_sensitive>0</case_sensitive>
+		<allow_multiple>0</allow_multiple>
+		<revenue>0.1</revenue>
+		<deleted>0</deleted>
+		<event_value_as_revenue>0</event_value_as_revenue>
+	</row>
+	<row key="2">
+		<idsite>1</idsite>
+		<idgoal>2</idgoal>
+		<name>Download Software2</name>
+		<description />
+		<match_attribute>url</match_attribute>
+		<pattern>latest.zip</pattern>
+		<pattern_type>contains</pattern_type>
+		<case_sensitive>0</case_sensitive>
+		<allow_multiple>0</allow_multiple>
+		<revenue>0.05</revenue>
+		<deleted>0</deleted>
+		<event_value_as_revenue>0</event_value_as_revenue>
+	</row>
+	<row key="3">
+		<idsite>1</idsite>
+		<idgoal>3</idgoal>
+		<name>Opens Contact Form</name>
+		<description />
+		<match_attribute>url</match_attribute>
+		<pattern>contact</pattern>
+		<pattern_type>contains</pattern_type>
+		<case_sensitive>0</case_sensitive>
+		<allow_multiple>0</allow_multiple>
+		<revenue>0</revenue>
+		<deleted>0</deleted>
+		<event_value_as_revenue>0</event_value_as_revenue>
+	</row>
+	<row key="4">
+		<idsite>1</idsite>
+		<idgoal>4</idgoal>
+		<name>Visit Docs</name>
+		<description />
+		<match_attribute>url</match_attribute>
+		<pattern>docs</pattern>
+		<pattern_type>contains</pattern_type>
+		<case_sensitive>0</case_sensitive>
+		<allow_multiple>0</allow_multiple>
+		<revenue>0</revenue>
+		<deleted>0</deleted>
+		<event_value_as_revenue>0</event_value_as_revenue>
+	</row>
+</result>
