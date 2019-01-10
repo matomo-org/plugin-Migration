@@ -1,5 +1,7 @@
 # Matomo Migration Plugin
 
+[![Build Status](https://travis-ci.org/matomo-org/plugin-Migration.svg?branch=master)](https://travis-ci.org/matomo-org/plugin-Migration)
+
 ## Description
 
 Lets you copy a Matomo Mjeasurable (Website, Mobile App, ...) including all tracked raw data and generated reports

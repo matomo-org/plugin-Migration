@@ -34,7 +34,7 @@ class Migrate extends ConsoleCommand
         $this->addOption('source-idsite', null,InputOption::VALUE_REQUIRED, 'Source Site ID you want to migrate');
         $this->addOption('target-db-host', null, InputOption::VALUE_REQUIRED, 'Target database host');
         $this->addOption('target-db-username', null, InputOption::VALUE_REQUIRED, 'Target database username');
-        $this->addOption('target-db-password', null, InputOption::VALUE_REQUIRED, 'Target database password');
+        $this->addOption('target-db-password', null, InputOption::VALUE_OPTIONAL, 'Target database password');
         $this->addOption('target-db-name', null, InputOption::VALUE_REQUIRED, 'Target database name');
         $this->addOption('target-db-prefix', null, InputOption::VALUE_OPTIONAL, 'Target database table prefix', '');
         $this->addOption('target-db-port', null, InputOption::VALUE_REQUIRED, 'Target database port', '3306');
