@@ -18,7 +18,7 @@ Before executing the migration command we always recommend to make a backup of t
 it first with the `dry-run` flag (dry-run can take a long time as well and will give you an idea of how long migration
 will take).
 
-To start a migration execute this command:
+To start a migration execute the `migration:measurable` command, example:
 
 ```
  ./console migration:measurable --source-idsite=1 --target-db-host=192.168.1.1 --target-db-username=root --target-db-password=secure --target-db-name=piwik2
