@@ -42,6 +42,9 @@ Processed SiteSettingMigration at 2019-01-10 02:48:01
 Processing GoalsMigration at 2019-01-10 02:48:01
 Found 4 goals at 2019-01-10 02:48:01
 Processed GoalsMigration at 2019-01-10 02:48:01
+Processing CustomDimensionMigration at 2019-01-10 02:48:01
+Found 3 custom dimensions at 2019-01-10 02:48:01
+Processed CustomDimensionMigration at 2019-01-10 02:48:01
 Processing LogMigration at 2019-01-10 02:48:01
 Found 2 visits at 2019-01-10 02:48:01
 Migrated 5% of visits at 2019-01-10 02:48:01
@@ -127,7 +130,6 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $this->disableArchiving();
 
         FakeAccess::clearAccess($superUser = true);
-        $params['xmlFieldsToRemove'] = array('pageIdAction');
         $this->runApiTests($api, $params);
 
         $this->setTargetDbPrefix('');
@@ -158,6 +160,14 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $testEnv->save();
     }
 
+    public function test_runMigration_CanBeExecutedMultipleTimesWithoutAnyIdProblems()
+    {
+        $result = $this->runCommand();
+        $this->assertEquals('0', $result);
+        $result = $this->runCommand();
+        $this->assertEquals('0', $result);
+    }
+
     public function test_runMigration_failsWhenNotSameStructure()
     {
         $logVisitTable = self::$fixture->targetDb->prefixTable('log_visit');
@@ -179,6 +189,7 @@ The following tables are missing in the target DB table "targetdb_log_action": i
             'Actions.getPageUrls',
             'SitesManager.getSiteFromId',
             'Goals.getGoals',
+            'CustomDimensions.getConfiguredCustomDimensions',
         );
 
         $apiToTest   = array();
@@ -187,7 +198,8 @@ The following tables are missing in the target DB table "targetdb_log_action": i
                 'idSite'     => 1,
                 'date'       => self::$fixture->dateTime,
                 'periods'    => array('day', 'year'),
-                'testSuffix' => ''
+                'testSuffix' => '',
+                'xmlFieldsToRemove' => array('pageIdAction')
             )
         );
 

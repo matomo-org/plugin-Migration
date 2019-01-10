@@ -8,8 +8,6 @@
 
 namespace Piwik\Plugins\Migration\Migrations;
 
-use Piwik\Common;
-use Piwik\Db;
 use Piwik\Plugins\Migration\TargetDb;
 
 class SiteUrlMigration extends BaseMigration
@@ -21,13 +19,6 @@ class SiteUrlMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
-        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('site_url') . ' WHERE idsite = ?', array($request->sourceIdSite));
-
-        $this->log(sprintf('Found %s site urls', count($rows)));
-
-        foreach ($rows as $row) {
-            $row['idsite'] = $request->targetIdSite;
-            $targetDb->insert('site_url', $row);
-        }
+        $this->migrateEntities($request, $targetDb, 'site_url', 'site urls');
     }
 }

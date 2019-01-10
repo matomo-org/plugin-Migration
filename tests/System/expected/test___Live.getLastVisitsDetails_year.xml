@@ -10,7 +10,7 @@
 				<type>action</type>
 				<url>http://example.com/sub/page</url>
 				<pageTitle>Viewing homepage</pageTitle>
-				<pageIdAction>4</pageIdAction>
+				
 				
 				
 				<pageId>3</pageId>
@@ -23,11 +23,12 @@
 				<icon />
 				
 				<bandwidth_pretty>0 M</bandwidth_pretty>
+				<dimension2 />
 			</row>
 			<row>
 				<type>search</type>
 				<url />
-				<pageIdAction />
+				
 				
 				
 				<pageId>4</pageId>
@@ -41,6 +42,7 @@
 				<subtitle>this is a site search query</subtitle>
 				
 				<bandwidth_pretty>0 M</bandwidth_pretty>
+				<dimension2 />
 			</row>
 			<row>
 				<type>ecommerceAbandonedCart</type>
@@ -60,6 +62,7 @@
 				<title>Abandoned Cart</title>
 				<subtitle>$ 2541 revenue - 1 items: A durable item)</subtitle>
 				
+				<dimension2 />
 			</row>
 		</actionDetails>
 		<goalConversions>0</goalConversions>
@@ -158,6 +161,7 @@
 				<pluginName>java</pluginName>
 			</row>
 		</pluginsIcons>
+		<dimension1 />
 	</row>
 	<row>
 		<idSite>1</idSite>
@@ -169,7 +173,7 @@
 				<type>action</type>
 				<url>http://example.com/</url>
 				<pageTitle>Viewing homepage</pageTitle>
-				<pageIdAction>2</pageIdAction>
+				
 				
 				
 				<pageId>1</pageId>
@@ -182,12 +186,13 @@
 				<icon />
 				
 				<bandwidth_pretty>0 M</bandwidth_pretty>
+				<dimension2 />
 			</row>
 			<row>
 				<type>action</type>
 				<url>http://example.com/sub/page</url>
 				<pageTitle>Second page view</pageTitle>
-				<pageIdAction>4</pageIdAction>
+				
 				
 				
 				<pageId>2</pageId>
@@ -200,6 +205,7 @@
 				<icon />
 				
 				<bandwidth_pretty>0 M</bandwidth_pretty>
+				<dimension2 />
 			</row>
 			<row>
 				<type>ecommerceOrder</type>
@@ -224,6 +230,7 @@
 				<title>Ordered (TestingOrder)</title>
 				<subtitle>$ 2541 revenue - 33 items: Test item!)</subtitle>
 				
+				<dimension2 />
 			</row>
 			<row>
 				<type>goal</type>
@@ -237,6 +244,7 @@
 				<title>Goal conversion</title>
 				<subtitle>Download Software ($ 5 revenue)</subtitle>
 				
+				<dimension2 />
 			</row>
 		</actionDetails>
 		<goalConversions>1</goalConversions>
@@ -335,5 +343,6 @@
 				<pluginName>java</pluginName>
 			</row>
 		</pluginsIcons>
+		<dimension1 />
 	</row>
 </result>

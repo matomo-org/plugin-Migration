@@ -14,6 +14,10 @@ from one Matomo instance to another Matomo instance.
 
 ### Usage
 
+Before executing the migration command we always recommend to make a backup of the target database and ideally also test
+it first with the `dry-run` flag (dry-run can take a long time as well and will give you an idea of how long migration
+will take).
+
 To start a migration execute this command:
 
 ```

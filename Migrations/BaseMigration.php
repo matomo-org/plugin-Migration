@@ -9,6 +9,7 @@
 namespace Piwik\Plugins\Migration\Migrations;
 
 use Piwik\Common;
+use Piwik\Db;
 use Piwik\DbHelper;
 use Piwik\Plugins\Migration\TargetDb;
 
@@ -29,6 +30,21 @@ abstract class BaseMigration
     abstract public function validateStructure(TargetDb $targetDb);
 
     abstract public function migrate(Request $request, TargetDb $targetDb);
+
+    protected function migrateEntities(Request $request, TargetDb $targetDb, $tableUnprefixed, $entityName, $unsetId = null)
+    {
+        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable($tableUnprefixed) . ' WHERE idsite = ?', array($request->sourceIdSite));
+
+        $this->log(sprintf('Found %s %s', count($rows), $entityName));
+
+        foreach ($rows as $row) {
+            $row['idsite'] = $request->targetIdSite;
+            if ($unsetId) {
+                unset($row[$unsetId]);
+            }
+            $targetDb->insert($tableUnprefixed, $row);
+        }
+    }
 
     protected function checkTablesHaveSameStructure(TargetDb $targetDb, $tableName)
     {

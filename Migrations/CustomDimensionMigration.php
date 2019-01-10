@@ -10,15 +10,15 @@ namespace Piwik\Plugins\Migration\Migrations;
 
 use Piwik\Plugins\Migration\TargetDb;
 
-class SiteSettingMigration extends BaseMigration
+class CustomDimensionMigration extends BaseMigration
 {
     public function validateStructure(TargetDb $targetDb)
     {
-        return $this->checkTablesHaveSameStructure($targetDb, 'site_setting');
+        return $this->checkTablesHaveSameStructure($targetDb, 'custom_dimensions');
     }
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
-        $this->migrateEntities($request, $targetDb, 'site_setting', 'site settings', 'idsite_setting');
+        $this->migrateEntities($request, $targetDb, 'custom_dimensions', 'custom dimensions');
     }
 }

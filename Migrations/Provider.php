@@ -8,6 +8,8 @@
 
 namespace Piwik\Plugins\Migration\Migrations;
 
+use Piwik\Plugin;
+
 class Provider
 {
     /**
@@ -23,6 +25,12 @@ class Provider
             new SiteSettingMigration(),
             new GoalsMigration()
         ];
+
+        $pluginManager = Plugin\Manager::getInstance();
+        if ($pluginManager->isPluginActivated('CustomDimensions')
+            && $pluginManager->isPluginLoaded('CustomDimensions')) {
+            $migrations[] = new CustomDimensionMigration();
+        }
 
         if (!$skipLogs) {
             $migrations[] = new LogMigration();

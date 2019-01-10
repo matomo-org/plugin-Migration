@@ -12,6 +12,8 @@ use Piwik\API\Request;
 use Piwik\Date;
 use Piwik\Db;
 use Piwik\DbHelper;
+use Piwik\Plugins\CustomDimensions\CustomDimensions;
+use Piwik\Plugins\CustomDimensions\Dao\Configuration;
 use Piwik\Plugins\Migration\TargetDb;
 use Piwik\Plugins\Goals;
 use Piwik\Tests\Framework\Fixture;
@@ -53,6 +55,7 @@ class MigrationFixture extends Fixture
 
         $this->setUpWebsite();
         $this->setUpGoals();
+        $this->setUpCustomDimensions();
         $this->trackFirstVisit();
         $this->trackSecondVisit();
 
@@ -62,6 +65,14 @@ class MigrationFixture extends Fixture
             'date' => '2013-01-23',
             'idSite' => $this->idSite
         ));
+    }
+
+    private function setUpCustomDimensions()
+    {
+        $configuration = new Configuration();
+        $configuration->configureNewDimension($this->idSite,  'MyName1', CustomDimensions::SCOPE_VISIT, 1, $active = true, $extractions = array(), $caseSensitive = true);
+        $configuration->configureNewDimension($this->idSite,  'MyName2', CustomDimensions::SCOPE_ACTION, 1, $active = true, $extractions = array(), $caseSensitive = true);
+        $configuration->configureNewDimension($this->idSite,  'MyName3', CustomDimensions::SCOPE_ACTION, 2, $active = false, $extractions = array(), $caseSensitive = true);
     }
 
     public static function copyTableStructure(TargetDb $targetDb)

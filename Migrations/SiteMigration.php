@@ -23,14 +23,10 @@ class SiteMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
-        if ($request->targetIdSite) {
-            $this->log(sprintf('No site created, target site was defined as %s', $request->targetIdSite));
-        } else {
-            $row = Db::fetchRow('SELECT * FROM ' . Common::prefixTable('site') . ' WHERE idsite = ?', array($request->sourceIdSite));
-            unset($row['idsite']);
-            $request->targetIdSite = $targetDb->insert('site', $row);
+        $row = Db::fetchRow('SELECT * FROM ' . Common::prefixTable('site') . ' WHERE idsite = ?', array($request->sourceIdSite));
+        unset($row['idsite']);
+        $request->targetIdSite = $targetDb->insert('site', $row);
 
-            $this->log(sprintf('Target site is %s', $request->targetIdSite));
-        }
+        $this->log(sprintf('Target site is %s', $request->targetIdSite));
     }
 }
