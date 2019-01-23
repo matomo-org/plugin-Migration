@@ -4,7 +4,9 @@
 
 ## Description
 
-Lets you copy a Matomo Mjeasurable (Website, Mobile App, ...) including all tracked raw data and generated reports
+**Beta version: The Migration feature is currently in beta. As such it may contain bugs, or may not work as expected. Please <a href="https://github.com/matomo-org/plugin-Migration/issues">report any issues</a> you encounter or any other feedback back to us.**
+
+Lets you copy a Matomo Measurable (Website, Mobile App, ...) including all tracked raw data and generated reports
 from one Matomo instance to another Matomo instance.
 
 ### Requirements
@@ -36,5 +38,7 @@ Optional parameters are:
 ```
 
 Please note that the migration can take a while depending on the amount of data that needs to be copied.
+
+No data from the original Matomo instance will be deleted, only new data will be added to the new Matomo instance.
 
 No premium feature data is currently being migrated.
