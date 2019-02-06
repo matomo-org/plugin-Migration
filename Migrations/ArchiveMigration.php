@@ -28,8 +28,9 @@ class ArchiveMigration extends BaseMigration
         $archiveTables = ArchiveTableCreator::getTablesArchivesInstalled();
         $this->log(sprintf('Found %s archive tables', count($archiveTables)));
 
+        $configDb = Config::getInstance()->database;
         foreach ($archiveTables as $archiveTable) {
-            $archiveTable = str_replace(Config::getInstance()->database['tables_prefix'], '', $archiveTable);
+            $archiveTable = str_replace($configDb['tables_prefix'], '', $archiveTable);
             $targetDb->createArchiveTableIfNeeded($archiveTable);
 
             $batchQuery = new BatchQuery($limit = 1000);
