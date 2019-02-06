@@ -37,9 +37,11 @@ class ArchiveMigration extends BaseMigration
             $archiveTablePrefixed = Common::prefixTable($archiveTable);
             foreach ($batchQuery->generateQuery('SELECT * FROM ' . $archiveTablePrefixed . ' WHERE idsite = ? ORDER BY idarchive ASC', array($request->sourceIdSite)) as $archives) {
                 foreach ($archives as $archive) {
-                    $archive['idarchive'] = $this->createArchiveId($targetDb, $archiveTable, $archive['idarchive']);
-                    $archive['idsite']    = $request->targetIdSite;
-                    $targetDb->insert($archiveTable, $archive);
+                    if (!empty($archive['idarchive'])) {
+                        $archive['idarchive'] = $this->createArchiveId($targetDb, $archiveTable, $archive['idarchive']);
+                        $archive['idsite']    = $request->targetIdSite;
+                        $targetDb->insert($archiveTable, $archive);
+                    }
                 }
             }
             $this->log('Migrated archive table ' . $archiveTable);
