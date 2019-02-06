@@ -30,6 +30,8 @@ class ArchiveMigration extends BaseMigration
 
         $configDb = Config::getInstance()->database;
         foreach ($archiveTables as $archiveTable) {
+            $this->log('Starting to migrate archive table ' . $archiveTable);
+            
             $archiveTable = str_replace($configDb['tables_prefix'], '', $archiveTable);
             $targetDb->createArchiveTableIfNeeded($archiveTable);
 
