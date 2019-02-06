@@ -124,8 +124,8 @@ class LogMigration extends BaseMigration
 
         foreach ($visitRows as $visitRow) {
             $usesCustomDimensions = isset($visitRow['last_idlink_va']);
-            $hasMapForIdLinkVa = isset($visitorLinkActionMap[$visitRow['last_idlink_va']]);
-            if ($usesCustomDimensions && $hasMapForIdLinkVa) {
+            $hasMapForIdLinkVa = $usesCustomDimensions && isset($visitorLinkActionMap[$visitRow['last_idlink_va']]);
+            if ($hasMapForIdLinkVa) {
                 $newLastIdLinkVa = $visitorLinkActionMap[$visitRow['last_idlink_va']];
 
                 $targetDb->update('log_visit', array('last_idlink_va' => $newLastIdLinkVa), array(
