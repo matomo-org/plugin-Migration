@@ -10,6 +10,7 @@ namespace Piwik\Plugins\Migration\tests\System\Commands;
 
 use Piwik\Access;
 use Piwik\Db;
+use Piwik\Piwik;
 use Piwik\Plugins\Migration\tests\Fixtures\MigrationFixture;
 use Piwik\Config;
 use Piwik\Tests\Framework\Mock\FakeAccess;
@@ -27,6 +28,14 @@ class MigrateTest extends ConsoleCommandTestCase
      */
     public static $fixture = null; // initialized below class definition
 
+    public function tearDown()
+    {
+        parent::tearDown();
+
+        // otherwise won't be reset if test fails
+        $this->setTargetDbPrefix('');
+    }
+
     public function test_runMigration()
     {
         $result = $this->runCommand();
@@ -42,6 +51,12 @@ Processed SiteSettingMigration at 2019-01-10 02:48:01
 Processing GoalsMigration at 2019-01-10 02:48:01
 Found 4 goals at 2019-01-10 02:48:01
 Processed GoalsMigration at 2019-01-10 02:48:01
+Processing SegmentsMigration at 2019-01-10 02:48:01
+Found 2 segments at 2019-01-10 02:48:01
+Processed SegmentsMigration at 2019-01-10 02:48:01
+Processing AnnotationsMigration at 2019-01-10 02:48:01
+Found annotations at 2019-01-10 02:48:01
+Processed AnnotationsMigration at 2019-01-10 02:48:01
 Processing CustomDimensionMigration at 2019-01-10 02:48:01
 Found 3 custom dimensions at 2019-01-10 02:48:01
 Processed CustomDimensionMigration at 2019-01-10 02:48:01
@@ -58,18 +73,31 @@ Migrated 2 visits. The number of migrated visits may be higher if data is still 
 Processed LogMigration at 2019-01-10 02:48:01
 Processing ArchiveMigration at 2019-01-10 02:48:01
 Found 13 archive tables at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
 Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
 Processed ArchiveMigration at 2019-01-10 02:48:01
 ', $this->applicationTester->getDisplay());
@@ -130,7 +158,12 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $this->disableArchiving();
 
         FakeAccess::clearAccess($superUser = true);
-        $this->runApiTests($api, $params);
+        try {
+            $this->runApiTests($api, $params);
+        } catch (\Exception $e) {
+            $this->setTargetDbPrefix('');
+            throw $e;
+        }
 
         $this->setTargetDbPrefix('');
     }
@@ -163,6 +196,10 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
     public function test_runMigration_CanBeExecutedMultipleTimesWithoutAnyIdProblems()
     {
         $result = $this->runCommand();
+        $this->assertContains('Starting to migrate archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
+Skipping table because it is a target table targetdb_archive_numeric_2013_01 and source prefix is: at 2019-01-10 02:48:01
+Skipping table because it is a target table targetdb_archive_blob_2013_01 and source prefix is: at 2019-01-10 02:48:01', $this->applicationTester->getDisplay());
         $this->assertEquals('0', $result);
         $result = $this->runCommand();
         $this->assertEquals('0', $result);

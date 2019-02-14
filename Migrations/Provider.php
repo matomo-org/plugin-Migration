@@ -23,7 +23,9 @@ class Provider
             new SiteMigration(),
             new SiteUrlMigration(),
             new SiteSettingMigration(),
-            new GoalsMigration()
+            new GoalsMigration(),
+            new SegmentsMigration(),
+            new AnnotationsMigration()
         ];
 
         $pluginManager = Plugin\Manager::getInstance();

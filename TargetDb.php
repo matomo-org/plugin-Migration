@@ -29,7 +29,12 @@ class TargetDb
 
     public function __construct($config)
     {
-        $this->config = array_merge(Db::getDatabaseConfig(), $config);
+        foreach (Db::getDatabaseConfig() as $key => $val) {
+            $this->config[$key] = $val; // otherwise we change the reference of DB config :(
+        }
+        foreach ($config as $key => $val) {
+            $this->config[$key] = $val;
+        }
         $this->db = $this->testConnection($this->config);
         return $this->db;
     }
