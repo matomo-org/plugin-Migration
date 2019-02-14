@@ -31,14 +31,14 @@ abstract class BaseMigration
 
     abstract public function migrate(Request $request, TargetDb $targetDb);
 
-    protected function migrateEntities(Request $request, TargetDb $targetDb, $tableUnprefixed, $entityName, $unsetId = null)
+    protected function migrateEntities(Request $request, TargetDb $targetDb, $tableUnprefixed, $entityName, $unsetId = null, $idSiteColumnName = 'idsite')
     {
-        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable($tableUnprefixed) . ' WHERE idsite = ?', array($request->sourceIdSite));
+        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable($tableUnprefixed) . ' WHERE '.$idSiteColumnName.' = ?', array($request->sourceIdSite));
 
         $this->log(sprintf('Found %s %s', count($rows), $entityName));
 
         foreach ($rows as $row) {
-            $row['idsite'] = $request->targetIdSite;
+            $row[$idSiteColumnName] = $request->targetIdSite;
             if ($unsetId) {
                 unset($row[$unsetId]);
             }

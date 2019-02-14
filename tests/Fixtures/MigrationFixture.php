@@ -16,6 +16,8 @@ use Piwik\Plugins\CustomDimensions\CustomDimensions;
 use Piwik\Plugins\CustomDimensions\Dao\Configuration;
 use Piwik\Plugins\Migration\TargetDb;
 use Piwik\Plugins\Goals;
+use Piwik\Plugins\SegmentEditor\API as SegmentApi;
+use Piwik\Plugins\Annotations\API as AnnotationsAPI;
 use Piwik\Tests\Framework\Fixture;
 use Piwik\Plugins\SitesManager\API as APISitesManager;
 
@@ -56,6 +58,8 @@ class MigrationFixture extends Fixture
         $this->setUpWebsite();
         $this->setUpGoals();
         $this->setUpCustomDimensions();
+        $this->setUpSegments();
+        $this->setUpAnnotations();
         $this->trackFirstVisit();
         $this->trackSecondVisit();
 
@@ -73,6 +77,17 @@ class MigrationFixture extends Fixture
         $configuration->configureNewDimension($this->idSite,  'MyName1', CustomDimensions::SCOPE_VISIT, 1, $active = true, $extractions = array(), $caseSensitive = true);
         $configuration->configureNewDimension($this->idSite,  'MyName2', CustomDimensions::SCOPE_ACTION, 1, $active = true, $extractions = array(), $caseSensitive = true);
         $configuration->configureNewDimension($this->idSite,  'MyName3', CustomDimensions::SCOPE_ACTION, 2, $active = false, $extractions = array(), $caseSensitive = true);
+    }
+
+    private function setUpSegments()
+    {
+        SegmentApi::getInstance()->add('foo', 'visitCount==5', $this->idSite);
+        SegmentApi::getInstance()->add('bar', 'visitCount==10', $this->idSite);
+    }
+
+    private function setUpAnnotations()
+    {
+        AnnotationsAPI::getInstance()->add($this->idSite, '2019-01-02', 'foobar');
     }
 
     public static function copyTableStructure(TargetDb $targetDb)
