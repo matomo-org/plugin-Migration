@@ -26,13 +26,24 @@ class ArchiveMigration extends BaseMigration
     public function migrate(Request $request, TargetDb $targetDb)
     {
         $archiveTables = ArchiveTableCreator::getTablesArchivesInstalled();
+        $archiveTables = array_unique($archiveTables);
         $this->log(sprintf('Found %s archive tables', count($archiveTables)));
 
-        $configDb = Config::getInstance()->database;
+        $sourcePrefix = Common::prefixTable('');
+
         foreach ($archiveTables as $archiveTable) {
+            $isSourceTable = strpos($archiveTable, $sourcePrefix . 'archive_') === 0;
+            if (!$isSourceTable) {
+                $this->log('Skipping table because it is a target table ' . $archiveTable  . ' and source prefix is:' . $sourcePrefix);
+                // special case...
+                // user is migrating from one matomo instance to another matomo instance with the same DB but different
+                // prefix... we can only take into consideration the DB tables that belong to the source DB
+                // I think it also only happens when the source DB prefix is an empty string
+                continue;
+            }
+
             $this->log('Starting to migrate archive table ' . $archiveTable);
-            
-            $archiveTable = str_replace($configDb['tables_prefix'], '', $archiveTable);
+            $archiveTable = str_replace($sourcePrefix, '', $archiveTable);
             $targetDb->createArchiveTableIfNeeded($archiveTable);
 
             $batchQuery = new BatchQuery($limit = 1000);
