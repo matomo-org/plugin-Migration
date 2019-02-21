@@ -1,5 +1,8 @@
 ## Changelog
 
+### 3.0.4
+- Fix possible duplicate entry error while migrating archives
+
 ### 3.0.3
 - Migrate segments & annotations
 
