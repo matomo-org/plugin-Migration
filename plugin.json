@@ -1,7 +1,7 @@
 {
   "name": "Migration",
   "description": "Migrate/copy any measurable (site, app, roll-up) from one Matomo to another Matomo",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "theme": false,
   "require": {
     "piwik": ">=3.7.0,<4.0.0-b1"
