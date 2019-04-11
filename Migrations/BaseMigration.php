@@ -59,11 +59,11 @@ abstract class BaseMigration
         $errors = array();
         $diff = array_diff($columnNames, $targetColumnNames);
         if (!empty($diff)) {
-            $errors[] = sprintf('The following tables are missing in the target DB table "%s": %s', $targetTable, implode(', ', $diff));
+            $errors[] = sprintf('The following columns are missing in the target DB table "%s": %s', $targetTable, implode(', ', $diff));
         } else {
             $diff = array_diff($targetColumnNames, $columnNames);
             if (!empty($diff)) {
-                $errors[] = sprintf('The following tables are missing in the source DB table "%s": %s', $sourceTable, implode(', ', $diff));
+                $errors[] = sprintf('The following columns are missing in the source DB table "%s": %s', $sourceTable, implode(', ', $diff));
             }
         }
 
