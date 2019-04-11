@@ -213,8 +213,8 @@ Skipping table because it is a target table targetdb_archive_blob_2013_01 and so
         self::$fixture->targetDb->getDb()->query("ALTER TABLE $logActionTable DROP COLUMN idaction");
 
         $result = $this->runCommand();
-        $this->assertContains('The following tables are missing in the target DB table "targetdb_log_visit": idsite
-The following tables are missing in the target DB table "targetdb_log_action": idaction', $this->applicationTester->getDisplay());
+        $this->assertContains('The following columns are missing in the target DB table "targetdb_log_visit": idsite
+The following columns are missing in the target DB table "targetdb_log_action": idaction', $this->applicationTester->getDisplay());
         $this->assertEquals('1', $result);
     }
 
