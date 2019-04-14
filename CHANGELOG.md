@@ -1,5 +1,8 @@
 ## Changelog
 
+### 3.0.5
+- Fix an issue in copying visits
+
 ### 3.0.4
 - Fix possible duplicate entry error while migrating archives
 

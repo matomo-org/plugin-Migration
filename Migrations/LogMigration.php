@@ -70,7 +70,7 @@ class LogMigration extends BaseMigration
             $visitorIdMap[$oldIdVisit] = $targetDb->insert('log_visit', $row);
         }
 
-        $visitorIds = array_map('intval', array_values($visitorIdMap));
+        $visitorIds = array_map('intval', array_keys($visitorIdMap));
         $visitorIds = implode(',', $visitorIds);
 
         $batchQuery = new BatchQuery();
