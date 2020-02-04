@@ -39,6 +39,8 @@ Optional parameters are:
 
 Please note that the migration can take a while depending on the amount of data that needs to be copied.
 
+The migration tool will create a new website in the target Matomo and copy all the data from the source website to this newly created target website.
+
 No data from the original Matomo instance will be deleted, only new data will be added to the new Matomo instance.
 
 No premium feature data is currently being migrated.
