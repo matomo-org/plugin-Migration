@@ -11,13 +11,14 @@ from one Matomo instance to another Matomo instance.
 
 ### Requirements
 
-* You need access to your Matomo server and be able to execute a command on the console see usage.
+* You need access to source Matomo server and be able to execute a command on the console.
+* You need access to target Matomo database.
 * Make sure you have updated both Matomo servers to the same Matomo version or have at least the same DB structure.
 
 ### Usage
 
 Before executing the migration command we always recommend to make a backup of the target database and ideally also test
-it first with the `dry-run` flag (dry-run can take a long time as well and will give you an idea of how long migration
+it first with the `dry-run` flag (dry-run is faster but can take a long time as well and will give you an idea of how long migration
 will take).
 
 To start a migration execute the `migration:measurable` command, example:
@@ -36,6 +37,16 @@ Optional parameters are:
  --dry-run
  --disable-db-transactions
 ```
+
+Both Matomo instances may be on different servers with proper firewall rules that restrict database access on target instance.
+In such case, the easiest way for source server to access target database is to create a ssh tunnel on new port (e.g. 3307) in another terminal.
+Then, execute to the above command with `--target-db-port=3307` instead to access port 3306 on target host. Example:
+```
+ssh -NL 3307:localhost:3306 targetuser@targethost
+```
+
+Matomo instance and files in folders may be owned by a special user (e.g. `www-data`) with restricted ssh access.
+The abovementioned may be run either under root (e.g. `sudo ...`), or the special user (`sudo -u www-data ...`).
 
 Please note that the migration can take a while depending on the amount of data that needs to be copied.
 
