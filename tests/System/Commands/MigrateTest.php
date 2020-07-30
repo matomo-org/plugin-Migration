@@ -28,7 +28,7 @@ class MigrateTest extends ConsoleCommandTestCase
      */
     public static $fixture = null; // initialized below class definition
 
-    public function tearDown()
+    public function tearDown(): void
     {
         parent::tearDown();
 

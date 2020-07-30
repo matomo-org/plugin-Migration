@@ -24,7 +24,7 @@ class TargetDbTest extends IntegrationTestCase
      */
     private $targetDb;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -34,7 +34,7 @@ class TargetDbTest extends IntegrationTestCase
         MigrationFixture::createTargetDbTableStructure($this->targetDb);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         MigrationFixture::tearDownTargetDbTableStructure($this->targetDb);
         parent::tearDown();

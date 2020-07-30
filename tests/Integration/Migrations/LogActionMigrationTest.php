@@ -31,7 +31,7 @@ class LogActionMigrationTest extends IntegrationTestCase
      */
     private $migration;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -42,7 +42,7 @@ class LogActionMigrationTest extends IntegrationTestCase
         $this->migration = new LogActionMigration();
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         MigrationFixture::tearDownTargetDbTableStructure($this->targetDb);
         parent::tearDown();
