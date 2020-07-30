@@ -44,7 +44,7 @@ class MigrationFixture extends Fixture
      */
     public $targetDb;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
