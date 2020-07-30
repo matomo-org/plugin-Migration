@@ -13,6 +13,7 @@ from one Matomo instance to another Matomo instance.
 
 * You need access to your Matomo server and be able to execute a command on the console see usage.
 * Make sure you have updated both Matomo servers to the same Matomo version or have at least the same DB structure.
+* Wanting to migrate from Matomo On-Premise to Matomo for WordPress? [Learn more about this here](https://matomo.org/faq/wordpress/how-do-i-migrate-all-my-data-from-matomo-on-premise-to-matomo-for-wordpress/)
 
 ### Usage
 
