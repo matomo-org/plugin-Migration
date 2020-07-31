@@ -72,11 +72,9 @@ Migrated 90% of visits at 2019-01-10 02:48:01
 Migrated 2 visits. The number of migrated visits may be higher if data is still tracked into the source Matomo while migrating the data at 2019-01-10 02:48:01
 Processed LogMigration at 2019-01-10 02:48:01
 Processing ArchiveMigration at 2019-01-10 02:48:01
-Found 13 archive tables at 2019-01-10 02:48:01
+Found 14 archive tables at 2019-01-10 02:48:01
 Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
-Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
 Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
 Starting to migrate archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
@@ -99,6 +97,10 @@ Starting to migrate archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
 Starting to migrate archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
 Processed ArchiveMigration at 2019-01-10 02:48:01
 ', $this->applicationTester->getDisplay());
         $this->assertEquals('0', $result);
@@ -129,11 +131,11 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $this->assertCount(2, $conversionItems);
 
         $archives = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('archive_numeric_2013_01'));
-        $this->assertGreaterThanOrEqual(200, count($archives));
+        $this->assertGreaterThanOrEqual(195, count($archives));
         $this->assertLessThanOrEqual(600, count($archives));
 
         $archives = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('archive_blob_2013_01'));
-        $this->assertGreaterThanOrEqual(200, count($archives));
+        $this->assertGreaterThanOrEqual(195, count($archives));
         $this->assertLessThanOrEqual(600, count($archives));
     }
 
@@ -196,10 +198,10 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
     public function test_runMigration_CanBeExecutedMultipleTimesWithoutAnyIdProblems()
     {
         $result = $this->runCommand();
-        $this->assertContains('Starting to migrate archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
-Skipping table because it is a target table targetdb_archive_numeric_2013_01 and source prefix is: at 2019-01-10 02:48:01
-Skipping table because it is a target table targetdb_archive_blob_2013_01 and source prefix is: at 2019-01-10 02:48:01', $this->applicationTester->getDisplay());
+        $this->assertStringContainsString('Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01', $this->applicationTester->getDisplay());
         $this->assertEquals('0', $result);
         $result = $this->runCommand();
         $this->assertEquals('0', $result);
@@ -213,7 +215,7 @@ Skipping table because it is a target table targetdb_archive_blob_2013_01 and so
         self::$fixture->targetDb->getDb()->query("ALTER TABLE $logActionTable DROP COLUMN idaction");
 
         $result = $this->runCommand();
-        $this->assertContains('The following columns are missing in the target DB table "targetdb_log_visit": idsite
+        $this->assertStringContainsString('The following columns are missing in the target DB table "targetdb_log_visit": idsite
 The following columns are missing in the target DB table "targetdb_log_action": idaction', $this->applicationTester->getDisplay());
         $this->assertEquals('1', $result);
     }

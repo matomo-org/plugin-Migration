@@ -58,12 +58,10 @@ class TargetDbTest extends IntegrationTestCase
         $this->assertEquals(array('idsite', 'url'), $columns);
     }
 
-    /**
-     * @expectedException \Exception
-     * @expectedExceptionMessage  foobar' doesn't exist
-     */
     public function test_getTableColumns_notExists()
     {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('foobar\' doesn\'t exist');
         $this->targetDb->getTableColumns('foobar');
     }
 
@@ -76,8 +74,8 @@ class TargetDbTest extends IntegrationTestCase
 
     public function test_createArchiveTableIfNeeded_doesNotFailWhenAlreadyExists()
     {
-        $this->targetDb->createArchiveTableIfNeeded('archive_blob_2006_01');
-        $this->targetDb->createArchiveTableIfNeeded('archive_blob_2006_01');
+        $this->assertNull($this->targetDb->createArchiveTableIfNeeded('archive_blob_2006_01'));
+        $this->assertNull($this->targetDb->createArchiveTableIfNeeded('archive_blob_2006_01'));
     }
 
     public function test_createArchiveId()

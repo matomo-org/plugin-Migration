@@ -130,7 +130,7 @@ class MigrationFixture extends Fixture
         }
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         self::tearDownTargetDbTableStructure($this->targetDb);
         parent::tearDown();

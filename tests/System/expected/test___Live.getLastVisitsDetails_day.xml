@@ -5,6 +5,7 @@
 		<idVisit>2</idVisit>
 		<visitIp>56.11.55.73</visitIp>
 		
+		<fingerprint>3d7de8315a349072</fingerprint>
 		<actionDetails>
 			<row>
 				<type>action</type>
@@ -17,13 +18,14 @@
 				<bandwidth />
 				<timeSpent>360</timeSpent>
 				<timeSpentPretty>6 min 0s</timeSpentPretty>
-				<interactionPosition>1</interactionPosition>
+				<pageviewPosition>1</pageviewPosition>
 				<title>Viewing homepage</title>
 				<subtitle>http://example.com/sub/page</subtitle>
 				<icon />
+				<iconSVG>plugins/Morpheus/images/action.svg</iconSVG>
 				
-				<bandwidth_pretty>0 M</bandwidth_pretty>
 				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
 			</row>
 			<row>
 				<type>search</type>
@@ -36,18 +38,22 @@
 				<timeSpent>361</timeSpent>
 				<timeSpentPretty>6 min 1s</timeSpentPretty>
 				<siteSearchKeyword>this is a site search query</siteSearchKeyword>
-				<interactionPosition>2</interactionPosition>
-				<icon>plugins/Morpheus/images/search_ico.png</icon>
+				<siteSearchCategory />
+				<siteSearchCount />
+				<pageviewPosition>2</pageviewPosition>
+				<icon>plugins/Morpheus/images/search.png</icon>
+				<iconSVG>plugins/Morpheus/images/search.svg</iconSVG>
 				<title>Site Search</title>
 				<subtitle>this is a site search query</subtitle>
 				
-				<bandwidth_pretty>0 M</bandwidth_pretty>
 				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
 			</row>
 			<row>
 				<type>ecommerceAbandonedCart</type>
 				<revenue>2541</revenue>
 				<items>1</items>
+				
 				
 				<itemDetails>
 					<row>
@@ -56,11 +62,15 @@
 						<itemCategory>Best seller</itemCategory>
 						<price>321</price>
 						<quantity>1</quantity>
+						<categories>
+						<row>Best seller</row>
+						</categories>
 					</row>
 				</itemDetails>
 				<icon>plugins/Morpheus/images/ecommerceAbandonedCart.png</icon>
+				<iconSVG>plugins/Morpheus/images/ecommerceAbandonedCart.svg</iconSVG>
 				<title>Abandoned Cart</title>
-				<subtitle>$ 2541 revenue - 1 items: A durable item)</subtitle>
+				<subtitle>$2,541 revenue - 1 items: A durable item)</subtitle>
 				
 				<dimension2 />
 			</row>
@@ -86,9 +96,11 @@
 		<visitConvertedIcon />
 		<visitCount>1</visitCount>
 		<visitEcommerceStatus>abandonedCart</visitEcommerceStatus>
-		<visitEcommerceStatusIcon>plugins/Morpheus/images/ecommerceAbandonedCart.png</visitEcommerceStatusIcon>
+		<visitEcommerceStatusIcon>plugins/Morpheus/images/ecommerceAbandonedCart.svg</visitEcommerceStatusIcon>
 		<daysSinceFirstVisit>0</daysSinceFirstVisit>
+		<secondsSinceFirstVisit>0</secondsSinceFirstVisit>
 		<daysSinceLastEcommerceOrder>0</daysSinceLastEcommerceOrder>
+		<secondsSinceLastEcommerceOrder />
 		<visitDuration>721</visitDuration>
 		<visitDurationPretty>12 min 1s</visitDurationPretty>
 		<searches>1</searches>
@@ -143,8 +155,7 @@
 		<visitLocalTime>12:34:06</visitLocalTime>
 		<visitLocalHour>12</visitLocalHour>
 		<daysSinceLastVisit>0</daysSinceLastVisit>
-		<customVariables>
-		</customVariables>
+		<secondsSinceLastVisit>0</secondsSinceLastVisit>
 		<resolution>1024x768</resolution>
 		<plugins>cookie, flash, java</plugins>
 		<pluginsIcons>
@@ -162,12 +173,15 @@
 			</row>
 		</pluginsIcons>
 		<dimension1 />
+		<customVariables>
+		</customVariables>
 	</row>
 	<row>
 		<idSite>1</idSite>
 		<idVisit>1</idVisit>
 		<visitIp>156.5.3.2</visitIp>
 		
+		<fingerprint>e16cf2bbaeea2c88</fingerprint>
 		<actionDetails>
 			<row>
 				<type>action</type>
@@ -180,13 +194,14 @@
 				<bandwidth />
 				<timeSpent>360</timeSpent>
 				<timeSpentPretty>6 min 0s</timeSpentPretty>
-				<interactionPosition>1</interactionPosition>
+				<pageviewPosition>1</pageviewPosition>
 				<title>Viewing homepage</title>
 				<subtitle>http://example.com/</subtitle>
 				<icon />
+				<iconSVG>plugins/Morpheus/images/action.svg</iconSVG>
 				
-				<bandwidth_pretty>0 M</bandwidth_pretty>
 				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
 			</row>
 			<row>
 				<type>action</type>
@@ -199,13 +214,14 @@
 				<bandwidth />
 				<timeSpent>184</timeSpent>
 				<timeSpentPretty>3 min 4s</timeSpentPretty>
-				<interactionPosition>2</interactionPosition>
+				<pageviewPosition>2</pageviewPosition>
 				<title>Second page view</title>
 				<subtitle>http://example.com/sub/page</subtitle>
 				<icon />
+				<iconSVG>plugins/Morpheus/images/action.svg</iconSVG>
 				
-				<bandwidth_pretty>0 M</bandwidth_pretty>
 				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
 			</row>
 			<row>
 				<type>ecommerceOrder</type>
@@ -217,6 +233,7 @@
 				<revenueDiscount>0</revenueDiscount>
 				<items>33</items>
 				
+				
 				<itemDetails>
 					<row>
 						<itemSKU>SKU_ID</itemSKU>
@@ -224,11 +241,15 @@
 						<itemCategory>Test &amp; Category</itemCategory>
 						<price>777</price>
 						<quantity>33</quantity>
+						<categories>
+						<row>Test &amp; Category</row>
+						</categories>
 					</row>
 				</itemDetails>
 				<icon>plugins/Morpheus/images/ecommerceOrder.png</icon>
+				<iconSVG>plugins/Morpheus/images/ecommerceOrder.svg</iconSVG>
 				<title>Ordered (TestingOrder)</title>
-				<subtitle>$ 2541 revenue - 33 items: Test item!)</subtitle>
+				<subtitle>$2,541 revenue - 33 items: Test item!)</subtitle>
 				
 				<dimension2 />
 			</row>
@@ -236,13 +257,15 @@
 				<type>goal</type>
 				<goalName>Download Software</goalName>
 				<goalId>1</goalId>
+				
 				<revenue>5</revenue>
 				<goalPageId />
 				
 				<url>http://example.com/sub/page</url>
 				<icon>plugins/Morpheus/images/goal.png</icon>
+				<iconSVG>plugins/Morpheus/images/goal.svg</iconSVG>
 				<title>Goal conversion</title>
-				<subtitle>Download Software ($ 5 revenue)</subtitle>
+				<subtitle>Download Software ($5 revenue)</subtitle>
 				
 				<dimension2 />
 			</row>
@@ -265,12 +288,14 @@
 		<visitorType>new</visitorType>
 		<visitorTypeIcon />
 		<visitConverted>1</visitConverted>
-		<visitConvertedIcon>plugins/Morpheus/images/goal.png</visitConvertedIcon>
+		<visitConvertedIcon>plugins/Morpheus/images/goal.svg</visitConvertedIcon>
 		<visitCount>1</visitCount>
 		<visitEcommerceStatus>ordered</visitEcommerceStatus>
-		<visitEcommerceStatusIcon>plugins/Morpheus/images/ecommerceOrder.png</visitEcommerceStatusIcon>
+		<visitEcommerceStatusIcon>plugins/Morpheus/images/ecommerceOrder.svg</visitEcommerceStatusIcon>
 		<daysSinceFirstVisit>0</daysSinceFirstVisit>
+		<secondsSinceFirstVisit>0</secondsSinceFirstVisit>
 		<daysSinceLastEcommerceOrder>0</daysSinceLastEcommerceOrder>
+		<secondsSinceLastEcommerceOrder>0</secondsSinceLastEcommerceOrder>
 		<visitDuration>544</visitDuration>
 		<visitDurationPretty>9 min 4s</visitDurationPretty>
 		<searches>0</searches>
@@ -325,8 +350,7 @@
 		<visitLocalTime>12:34:06</visitLocalTime>
 		<visitLocalHour>12</visitLocalHour>
 		<daysSinceLastVisit>0</daysSinceLastVisit>
-		<customVariables>
-		</customVariables>
+		<secondsSinceLastVisit>0</secondsSinceLastVisit>
 		<resolution>1024x768</resolution>
 		<plugins>cookie, flash, java</plugins>
 		<pluginsIcons>
@@ -344,5 +368,7 @@
 			</row>
 		</pluginsIcons>
 		<dimension1 />
+		<customVariables>
+		</customVariables>
 	</row>
 </result>

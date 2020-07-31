@@ -15,9 +15,11 @@
 		<entry_bounce_count>0</entry_bounce_count>
 		<exit_nb_visits>1</exit_nb_visits>
 		<avg_bandwidth>0</avg_bandwidth>
+		<avg_page_load_time>0</avg_page_load_time>
 		<avg_time_on_page>180</avg_time_on_page>
 		<bounce_rate>0%</bounce_rate>
 		<exit_rate>50%</exit_rate>
+		<segment>pageUrl=^http%253A%252F%252Fpiwik.net%252Fsub</segment>
 		<subtable>
 			<row>
 				<label>/page</label>
@@ -40,6 +42,7 @@
 				<bounce_rate>0%</bounce_rate>
 				<exit_rate>50%</exit_rate>
 				<url>http://example.com/sub/page</url>
+				<segment>pageUrl==http%253A%252F%252Fexample.com%252Fsub%252Fpage</segment>
 			</row>
 		</subtable>
 	</row>
@@ -59,10 +62,11 @@
 		<sum_daily_nb_uniq_visitors>1</sum_daily_nb_uniq_visitors>
 		<sum_daily_entry_nb_uniq_visitors>1</sum_daily_entry_nb_uniq_visitors>
 		<avg_bandwidth>0</avg_bandwidth>
+		<avg_page_load_time>0</avg_page_load_time>
 		<avg_time_on_page>360</avg_time_on_page>
 		<bounce_rate>0%</bounce_rate>
 		<exit_rate>0%</exit_rate>
 		<url>http://example.com/</url>
-		<segment>pageUrl==http%3A%2F%2Fexample.com%2F</segment>
+		<segment>pageUrl==http%253A%252F%252Fexample.com%252F</segment>
 	</row>
 </result>
