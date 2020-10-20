@@ -51,8 +51,10 @@ class ArchiveMigration extends BaseMigration
             foreach ($batchQuery->generateQuery('SELECT * FROM ' . $archiveTablePrefixed . ' WHERE idsite = ? ORDER BY idarchive,`name` ASC', array($request->sourceIdSite)) as $archives) {
                 foreach ($archives as $archive) {
                     if (!empty($archive['idarchive'])) {
+                        $this->log(sprintf('sourceId %s', $archive['idarchive']));
                         $archive['idarchive'] = $this->createArchiveId($targetDb, $archiveTable, $archive['idarchive']);
                         $archive['idsite']    = $request->targetIdSite;
+                        $this->log(sprintf('insert %s for name %s', $archive['idarchive'], $archive['name']));
                         $targetDb->insert($archiveTable, $archive);
                     }
                 }
@@ -71,7 +73,9 @@ class ArchiveMigration extends BaseMigration
         }
 
         if (!isset($this->idArchiveMap[$archiveTable][$soruceArchiveId])) {
-            $this->idArchiveMap[$archiveTable][$soruceArchiveId] = $targetDb->createArchiveId($archiveTable);
+            $archiveId = $targetDb->createArchiveId($archiveTable);
+            $this->log(sprintf('Created archiveId %s for sourceId %s', $archiveId, $soruceArchiveId));
+            $this->idArchiveMap[$archiveTable][$soruceArchiveId] = $archiveId;
         }
 
         return $this->idArchiveMap[$archiveTable][$soruceArchiveId];
