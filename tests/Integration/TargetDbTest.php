@@ -10,6 +10,7 @@ namespace Piwik\Plugins\Migration\tests\Integration;
 
 use Piwik\Plugins\Migration\TargetDb;
 use Piwik\Plugins\Migration\tests\Fixtures\MigrationFixture;
+use Piwik\Sequence;
 use Piwik\Tests\Framework\TestCase\IntegrationTestCase;
 
 /**
@@ -74,8 +75,27 @@ class TargetDbTest extends IntegrationTestCase
 
     public function test_createArchiveTableIfNeeded_doesNotFailWhenAlreadyExists()
     {
-        $this->assertNull($this->targetDb->createArchiveTableIfNeeded('archive_blob_2006_01'));
-        $this->assertNull($this->targetDb->createArchiveTableIfNeeded('archive_blob_2006_01'));
+        $tableName = 'archive_numeric_2006_01';
+        $tableNamePrefixed = $this->targetDb->prefixTable($tableName);
+        $this->assertNull($this->targetDb->createArchiveTableIfNeeded($tableName));
+        $this->assertNull($this->targetDb->createArchiveTableIfNeeded($tableName));
+
+        $this->assertEquals(0, $this->targetDb->getMaxArchiveId($tableNamePrefixed));
+
+        $this->targetDb->getDb()->query("INSERT INTO $tableNamePrefixed (idarchive, name,idsite, date1, date2, period, value) values (1, 'b', 1, '2020-01-02', '2020-01-02', '1', 'foo')");
+        $this->targetDb->getDb()->query("INSERT INTO $tableNamePrefixed (idarchive, name,idsite, date1, date2, period, value) values (2, 'b', 1, '2020-01-02', '2020-01-02', '1', 'foo')");
+
+        $this->assertEquals(2, $this->targetDb->getMaxArchiveId($tableNamePrefixed));
+
+        $sequenceTable = $this->targetDb->prefixTable(Sequence::TABLE_NAME);
+        $this->targetDb->getDb()->query('UPDATE ' . $sequenceTable . ' SET `value` = 0');
+
+        // calling create table again should fix the sequence value!
+        $this->assertNull($this->targetDb->createArchiveTableIfNeeded($tableName));
+
+        $val = $this->targetDb->getDb()->fetchOne('SELECT `value` from ' . $sequenceTable . ' where `name` like "%archive_numeric_2006_01%"');
+        // our script increases the value by 20
+        $this->assertEquals(2 + 20, $val);
     }
 
     public function test_createArchiveId()
