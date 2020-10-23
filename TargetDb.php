@@ -116,12 +116,52 @@ class TargetDb
             $createTableSql = str_replace($type, $table, $createTableSql);
             $createTableSql = str_replace($sourceDbTableName, $targetDbTableName, $createTableSql);
 
-            if ($this->dryRun) {
-                return;
+            if (!$this->dryRun) {
+                $this->db->query($createTableSql);
             }
-
-            $this->db->query($createTableSql);
         }
+
+        $numericTableName = str_replace('archive_blob', 'archive_numeric', $targetDbTableName);
+
+        if (!$this->dryRun) {
+            // need to make sure the correct sequence entry exists otherwise there may be random issues where it never gets created properly
+            $this->makeSequenceEnsureExists($numericTableName);
+        }
+
+        if ($this->doesTableExist($numericTableName)) {
+            // make sure sequence value is correct in case it is out of sync see #30
+            $val = $this->getMaxArchiveId($numericTableName);
+
+            if (!empty($val)) {
+                $val = $val + 20; // +20 to allow other sequences to be created concurrently
+
+                if (!$this->dryRun) {
+                    $sequenceTable = $this->prefixTable(Sequence::TABLE_NAME);
+                    // we also do +1 if the value is already high just to be safe...
+                    $this->db->query('UPDATE ' . $sequenceTable . ' SET `value` = if(`value` < ?, ?, value + 1) WHERE `name` = ?', array($val, $val, $targetDbTableName));
+                }
+            }
+        }
+    }
+
+    public function getMaxArchiveId($targetDbTableNamePrefixed)
+    {
+        $val = $this->db->fetchOne('SELECT max(idarchive) FROM '.$targetDbTableNamePrefixed);
+        if (empty($val)) {
+            $val = 0;
+        }
+        return $val;
+    }
+
+    private function makeSequenceEnsureExists($prefixedArchiveNumericTableName)
+    {
+        $sequence = new Sequence($prefixedArchiveNumericTableName, $this->db, $this->prefixTable(''));
+
+        if (!$sequence->exists()) {
+            $sequence->create();
+        }
+
+        return $sequence;
     }
 
     public function createArchiveId($table)
@@ -131,11 +171,7 @@ class TargetDb
         }
 
         $name = $this->prefixTable($table);
-        $sequence = new Sequence($name, $this->db, $this->prefixTable(''));
-
-        if (!$sequence->exists()) {
-            $sequence->create();
-        }
+        $sequence = $this->makeSequenceEnsureExists($name);
 
         return $sequence->getNextId();
     }
