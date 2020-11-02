@@ -1,5 +1,11 @@
 ## Changelog
 
+### 4.0.1
+- Update sequence table if needed
+
+### 4.0.0
+- Compatibility with Matomo 4
+
 ### 3.0.5
 - Fix an issue in copying visits
 

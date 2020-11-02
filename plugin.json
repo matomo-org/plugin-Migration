@@ -1,7 +1,7 @@
 {
   "name": "Migration",
   "description": "Migrate/copy any measurable (site, app, roll-up) from one Matomo to another Matomo",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "theme": false,
   "require": {
     "matomo": ">=4.0.0-b1,<5.0.0-b1"

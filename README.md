@@ -1,6 +1,6 @@
 # Matomo Migration Plugin
 
-[![Build Status](https://travis-ci.org/matomo-org/plugin-Migration.svg?branch=master)](https://travis-ci.org/matomo-org/plugin-Migration)
+[![Build Status](https://travis-ci.com/matomo-org/plugin-Migration.svg?branch=4.x-dev)](https://travis-ci.com/matomo-org/plugin-Migration)
 
 ## Description
 
