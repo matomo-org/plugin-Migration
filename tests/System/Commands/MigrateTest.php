@@ -72,7 +72,7 @@ Migrated 90% of visits at 2019-01-10 02:48:01
 Migrated 2 visits. The number of migrated visits may be higher if data is still tracked into the source Matomo while migrating the data at 2019-01-10 02:48:01
 Processed LogMigration at 2019-01-10 02:48:01
 Processing ArchiveMigration at 2019-01-10 02:48:01
-Found 14 archive tables at 2019-01-10 02:48:01
+Found 15 archive tables at 2019-01-10 02:48:01
 Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
 Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
@@ -101,6 +101,8 @@ Starting to migrate archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
 Migrated archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
 Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
 Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_blob_2013_12 at 2019-01-10 02:48:01
+Migrated archive table archive_blob_2013_12 at 2019-01-10 02:48:01
 Processed ArchiveMigration at 2019-01-10 02:48:01
 ', $this->applicationTester->getDisplay());
         $this->assertEquals('0', $result);
