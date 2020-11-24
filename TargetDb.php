@@ -230,7 +230,11 @@ class TargetDb
     private function testConnection($config)
     {
         try {
-            $db = @Db\Adapter::factory($config['adapter'], $config);
+            $adapter = $config['adapter'];
+            if ($adapter === 'WordPress') {
+                $adapter = 'Mysqli';
+            }
+            $db = @Db\Adapter::factory($adapter, $config);
         } catch (Exception $e) {
             throw new Exception('Cannot connect to the target database: ' . $e->getMessage(), $e->getCode(), $e);
         }
