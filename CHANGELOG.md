@@ -1,5 +1,8 @@
 ## Changelog
 
+### 4.0.2
+- Support export from Matomo for WordPress
+
 ### 4.0.1
 - Update sequence table if needed
 
