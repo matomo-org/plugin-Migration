@@ -81,7 +81,7 @@ class Migrate extends ConsoleCommand
             foreach ($errors as $error) {
                 $output->writeln('<error>' . $error . '</error>');
             }
-            throw new \Exception('Please make sure both Matomo instances are on the same version');
+            throw new \Exception('Please make sure both Matomo instances are on the same version and have the same plugins and plugin versions installed.');
         }
 
         $request = new Request();
