@@ -29,12 +29,12 @@ To start a migration execute the `migration:measurable` command, example:
 Optional parameters are:
 
 ```
- --target-db-prefix=piwik_
- --target-db-port=3306
- --skip-logs
- --skip-archives
- --dry-run
- --disable-db-transactions
+ --target-db-prefix=piwik_      Target database table prefix (default: "")
+ --target-db-port=3306          Target database port (default: "3306")
+ --skip-logs                    Skip migration of logs (Raw tracking data)
+ --skip-archives                Skip migration of archives (Report data)
+ --dry-run                      Enable debug mode where it does not insert anything.
+ --disable-db-transactions      Disable the usage of MySQL database transactions
 ```
 
 Both Matomo instances may be on different servers with proper firewall rules that restrict database access on target instance.
