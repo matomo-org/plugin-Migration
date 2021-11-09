@@ -41,13 +41,19 @@ class Migrations
                 $this->log('Processed ' . $migration->getName());
             }
         } catch (\Exception $e) {
-            $targetDb->rollBack();
+            //Since change in implicit commits in php8 results in error to handle such cases we check if it's inTransaction
+            if ($targetDb->getDb()->getConnection()->inTransaction()) {
+                $targetDb->rollBack();
+            }
             if ($this->dryRun) {
                 $this->log($e->getTraceAsString());
             }
             throw $e;
         }
-        $targetDb->commit();
+        //Since change in implicit commits in php8 results in error to handle such cases we check if it's inTransaction
+        if ($targetDb->getDb()->getConnection()->inTransaction()) {
+            $targetDb->commit();
+        }
     }
 
     private function log($message)
