@@ -41,7 +41,8 @@ class Migrations
                 $this->log('Processed ' . $migration->getName());
             }
         } catch (\Exception $e) {
-            //Since change in implicit commits in php8 results in error to handle such cases we check if it's inTransaction
+            //Since php8, PDO::inTransaction() now reports the actual transaction state of the connection, rather than an approximation maintained by PDO. If a query that is subject to "implicit commit" is executed, PDO::inTransaction() will subsequently return false, as a transaction is no longer active
+            //inTransaction check fixes warning raised due to implicit commit change
             if ($targetDb->getDb()->getConnection()->inTransaction()) {
                 $targetDb->rollBack();
             }
@@ -50,7 +51,8 @@ class Migrations
             }
             throw $e;
         }
-        //Since change in implicit commits in php8 results in error to handle such cases we check if it's inTransaction
+        //Since php8, PDO::inTransaction() now reports the actual transaction state of the connection, rather than an approximation maintained by PDO. If a query that is subject to "implicit commit" is executed, PDO::inTransaction() will subsequently return false, as a transaction is no longer active
+        //inTransaction check fixes warning raised due to implicit commit change
         if ($targetDb->getDb()->getConnection()->inTransaction()) {
             $targetDb->commit();
         }
