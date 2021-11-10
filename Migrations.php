@@ -43,10 +43,7 @@ class Migrations
         } catch (\Exception $e) {
             //Since php8, PDO::inTransaction() now reports the actual transaction state of the connection, rather than an approximation maintained by PDO. If a query that is subject to "implicit commit" is executed, PDO::inTransaction() will subsequently return false, as a transaction is no longer active
             //inTransaction check fixes warning raised due to implicit commit change
-            $inTransactionMethodExists = method_exists($targetDb->getDb()->getConnection(),'inTransaction') ;
-            if ($inTransactionMethodExists && $targetDb->getDb()->getConnection()->inTransaction()) {
-                $targetDb->rollBack();
-            } else if (!$inTransactionMethodExists) {
+            if ($this->isInTransaction($targetDb)) {
                 $targetDb->rollBack();
             }
             if ($this->dryRun) {
@@ -56,10 +53,7 @@ class Migrations
         }
         //Since php8, PDO::inTransaction() now reports the actual transaction state of the connection, rather than an approximation maintained by PDO. If a query that is subject to "implicit commit" is executed, PDO::inTransaction() will subsequently return false, as a transaction is no longer active
         //inTransaction check fixes warning raised due to implicit commit change
-        $inTransactionMethodExists = method_exists($targetDb->getDb()->getConnection(),'inTransaction') ;
-        if ($inTransactionMethodExists && $targetDb->getDb()->getConnection()->inTransaction()) {
-            $targetDb->commit();
-        } else if (!$inTransactionMethodExists) {
+        if ($this->isInTransaction($targetDb)) {
             $targetDb->commit();
         }
     }
@@ -74,5 +68,12 @@ class Migrations
     public function onLog($callback)
     {
         $this->callback = $callback;
+    }
+
+    private function isInTransaction($targetDb)
+    {
+        $inTransactionMethodExists = method_exists($targetDb->getDb()->getConnection(),'inTransaction');
+
+        return (!$inTransactionMethodExists || $targetDb->getDb()->getConnection()->inTransaction());
     }
 }
