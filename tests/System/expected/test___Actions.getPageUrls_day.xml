@@ -16,22 +16,26 @@
 		<exit_nb_visits>1</exit_nb_visits>
 		<goals>
 			<row idgoal="ecommerceOrder">
-			  <nb_conversions>1</nb_conversions>
-			  <revenue>2541</revenue>
-			  <nb_conv_pages_before>2</nb_conv_pages_before>
-			  <nb_conversions_attrib>0.5</nb_conversions_attrib>
-			  <nb_conversions_page_rate>0</nb_conversions_page_rate>
-			  <nb_conversions_page_uniq>1</nb_conversions_page_uniq>
-			  <revenue_attrib>1270.5</revenue_attrib>
+				<nb_conversions>1</nb_conversions>
+				<revenue>2541</revenue>
+				<nb_conv_pages_before>2</nb_conv_pages_before>
+				<nb_conversions_attrib>0.5</nb_conversions_attrib>
+				<nb_conversions_page_rate>0</nb_conversions_page_rate>
+				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
+				<revenue_attrib>1270.5</revenue_attrib>
+				<revenue_entry>2541</revenue_entry>
+				<nb_conversions_entry_rate>1</nb_conversions_entry_rate>
+				<revenue_per_entry>2541</revenue_per_entry>
+				<nb_conversions_entry>1</nb_conversions_entry>
 			</row>
 			<row idgoal="1">
-			  <nb_conversions>1</nb_conversions>
-			  <revenue>5</revenue>
-			  <nb_conv_pages_before>2</nb_conv_pages_before>
-			  <nb_conversions_attrib>0.5</nb_conversions_attrib>
-			  <nb_conversions_page_rate>0</nb_conversions_page_rate>
-			  <nb_conversions_page_uniq>1</nb_conversions_page_uniq>
-			  <revenue_attrib>2.5</revenue_attrib>
+				<nb_conversions>1</nb_conversions>
+				<revenue>5</revenue>
+				<nb_conv_pages_before>2</nb_conv_pages_before>
+				<nb_conversions_attrib>0.5</nb_conversions_attrib>
+				<nb_conversions_page_rate>1</nb_conversions_page_rate>
+				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
+				<revenue_attrib>2.5</revenue_attrib>
 			</row>
 		</goals>
 		<avg_bandwidth>0</avg_bandwidth>
@@ -73,7 +77,7 @@
 						<revenue>5</revenue>
 						<nb_conv_pages_before>2</nb_conv_pages_before>
 						<nb_conversions_attrib>0.5</nb_conversions_attrib>
-						<nb_conversions_page_rate>0</nb_conversions_page_rate>
+						<nb_conversions_page_rate>1</nb_conversions_page_rate>
 						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 						<revenue_attrib>2.5</revenue_attrib>
 					</row>
@@ -110,6 +114,10 @@
 				<nb_conversions_page_rate>1</nb_conversions_page_rate>
 				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 				<revenue_attrib>1270.5</revenue_attrib>
+				<revenue_entry>2541</revenue_entry>
+				<nb_conversions_entry_rate>1</nb_conversions_entry_rate>
+				<revenue_per_entry>2541</revenue_per_entry>
+				<nb_conversions_entry>1</nb_conversions_entry>
 			</row>
 			<row idgoal="1">
 				<nb_conversions>1</nb_conversions>
