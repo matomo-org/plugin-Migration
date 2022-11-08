@@ -112,7 +112,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
         $site = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('site'));
         $this->assertCount(1, $site);
-        $this->assertSame('1', $site[0]['idsite']);
+        $this->assertEquals(1, $site[0]['idsite']);
         $this->assertSame('MigrationSite', $site[0]['name']);
 
         $siteUrls = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('site_url'));
