@@ -43,6 +43,12 @@ Then, execute to the above command with `--target-db-port=3307` instead to acces
 ```
 ssh -NL 3307:localhost:3306 targetuser@targethost
 ```
+This essentially maps port 3307 of the server to which are migrating (running the terminal command on) to port 3306 of the server you are migrating from and is specified by `targethost`.
+The `targethost` should be replaced by a valid IP or domain name referencing the server you are migrating from and must be accessible to the server that you are migrating to.
+The `targetuser` should be replaced with a valid SSH user account setup on that server that you are migrating from.
+
+An alternative to using an SSH tunnel is to make a backup of your MySQL database, copy it to the new server, import it into the database, and then migrate using that database name.
+This process is detailed in a [FAQ about moving between servers](https://matomo.org/faq/how-to-install/faq_76/).
 
 Matomo instance and files in folders may be owned by a special user (e.g. `www-data`) with restricted ssh access.
 The abovementioned may be run either under root (e.g. `sudo ...`), or the special user (`sudo -u www-data ...`).
