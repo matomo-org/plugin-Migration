@@ -20,6 +20,9 @@ Before executing the migration command we always recommend to make a backup of t
 it first with the `dry-run` flag (dry-run is faster but can take a long time as well and will give you an idea of how long migration
 will take).
 
+__NOTE:__ The migration tool will create a __new website__ in the target Matomo, using the next available `siteid`, and copy all the data from the source website to this newly created target website.
+Remember to update the tracking code to match the new `siteid`.
+
 To start a migration execute the `migration:measurable` command, example:
 
 ```
@@ -43,19 +46,18 @@ Then, execute to the above command with `--target-db-port=3307` instead to acces
 ```
 ssh -NL 3307:localhost:3306 targetuser@targethost
 ```
-This essentially maps port 3307 of the server to which are migrating (running the terminal command on) to port 3306 of the server you are migrating from and is specified by `targethost`.
-The `targethost` should be replaced by a valid IP or domain name referencing the server you are migrating from and must be accessible to the server that you are migrating to.
-The `targetuser` should be replaced with a valid SSH user account setup on that server that you are migrating from.
+This command should be run on the source Matomo server. It essentially maps port 3307 of the server to port 3306 of the server you are migrating to and is specified by `targethost`.
+The `targethost` should be replaced by a valid IP or domain name referencing the server you are migrating to and must be accessible to the server that you are migrating from.
+The `targetuser` should be replaced with a valid SSH user account setup on that server that you are migrating to.
 
-An alternative to using an SSH tunnel is to make a backup of your MySQL database, copy it to the new server, import it into the database, and then migrate using that database name.
-This process is detailed in a [FAQ about moving between servers](https://matomo.org/faq/how-to-install/faq_76/).
+An alternative to using an SSH tunnel is to make a backup of your MySQL database, copy it to the new server, import it into a temporary database, and then migrate using that database name.
+Remember to delete the temporary database after completing the migration, and checking that everything works.
+More information about this process can be found in a [FAQ about moving between servers](https://matomo.org/faq/how-to-install/faq_76/).
 
 Matomo instance and files in folders may be owned by a special user (e.g. `www-data`) with restricted ssh access.
 The abovementioned may be run either under root (e.g. `sudo ...`), or the special user (`sudo -u www-data ...`).
 
 Please note that the migration can take a while depending on the amount of data that needs to be copied.
-
-The migration tool will create a new website in the target Matomo and copy all the data from the source website to this newly created target website.
 
 No data from the original Matomo instance will be deleted, only new data will be added to the new Matomo instance.
 
