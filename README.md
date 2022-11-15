@@ -41,18 +41,18 @@ Optional parameters are:
 ```
 
 Both Matomo instances may be on different servers with proper firewall rules that restrict database access on target instance.
-In such case, the easiest way for source server to access target database is to create a ssh tunnel on new port (e.g. 3307) in another terminal.
+In such case, the easiest way for source server to access target database is to create a [ssh tunnel](https://www.ssh.com/academy/ssh/tunneling) on new port (e.g. 3307) in another terminal.
 Then, execute to the above command with `--target-db-port=3307` instead to access port 3306 on target host. Example:
 ```
 ssh -NL 3307:localhost:3306 targetuser@targethost
 ```
 This command should be run on the source Matomo server. It essentially maps port 3307 of the server to port 3306 of the server you are migrating to and is specified by `targethost`.
-The `targethost` should be replaced by a valid IP or domain name referencing the server you are migrating to and must be accessible to the server that you are migrating from.
-The `targetuser` should be replaced with a valid SSH user account setup on that server that you are migrating to.
+The `targethost` should be replaced by a valid IP or domain name referencing the server you are migrating to and must be accessible to the server that you are migrating from. So, the source server should be able to [ping](https://www.redhat.com/sysadmin/ping-usage-basics) the target server.
+The `targetuser` should be replaced with a valid SSH user account that has been setup on the server that you are migrating to. It's preferable to setup [an SSH key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) on the source server and use [the ssh-copy-id command](https://www.ssh.com/academy/ssh/copy-id) to add it to the authorized keys for the `targetuser`, but using the user's password should work too.
 
 An alternative to using an SSH tunnel is to make a backup of your MySQL database, copy it to the new server, import it into a temporary database, and then migrate using that database name.
 Remember to delete the temporary database after completing the migration, and checking that everything works.
-More information about this process can be found in a [FAQ about moving between servers](https://matomo.org/faq/how-to-install/faq_76/).
+For more information about this process please refer to: [How can I move Matomo from one server to another, also migrating the data from one mysql server to another?](https://matomo.org/faq/how-to-install/faq_76/).
 
 Matomo instance and files in folders may be owned by a special user (e.g. `www-data`) with restricted ssh access.
 The abovementioned may be run either under root (e.g. `sudo ...`), or the special user (`sudo -u www-data ...`).
