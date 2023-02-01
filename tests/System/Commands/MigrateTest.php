@@ -225,17 +225,26 @@ The following columns are missing in the target DB table "targetdb_log_action": 
     {
         $apis = [
             'API.get',
-            'Live.getLastVisitsDetails',
             'Actions.getPageUrls',
             'SitesManager.getSiteFromId',
             'Goals.getGoals',
             'CustomDimensions.getConfiguredCustomDimensions',
         ];
 
+        // This one doesn't play nice with PHP 8 and earlier versions of Matomo. So, only include it for newer versions
+        if (version_compare(Version::VERSION, '4.13.0-b1', '>=') || version_compare(PHP_VERSION, '8.0.0', '<')) {
+            $apis[] = 'Live.getLastVisitsDetails';
+        }
+
         $apiToTest   = [];
         foreach ($apis as $api) {
             $testSuffix = '';
-            if (in_array($api, ['Actions.getPageUrls','SitesManager.getSiteFromId','CustomDimensions.getConfiguredCustomDimensions'])) {
+            if (in_array($api, [
+                'Actions.getPageUrls',
+                'SitesManager.getSiteFromId',
+                'CustomDimensions.getConfiguredCustomDimensions',
+                'Live.getLastVisitsDetails',
+                ])) {
                 $testSuffix = version_compare(Version::VERSION, '4.13.0-b1', '<=') ? 'Old' : '';
             }
             $api = [$api];
