@@ -235,7 +235,7 @@ The following columns are missing in the target DB table "targetdb_log_action": 
         $apiToTest   = [];
         foreach ($apis as $api) {
             $testSuffix = '';
-            if (in_array($api, ['Actions.getPageUrls','CustomDimensions.getConfiguredCustomDimensions'])) {
+            if (in_array($api, ['Actions.getPageUrls','SitesManager.getSiteFromId','CustomDimensions.getConfiguredCustomDimensions'])) {
                 $testSuffix = version_compare(Version::VERSION, '4.13.0-b1', '<=') ? 'Old' : '';
             }
             $api = [$api];
