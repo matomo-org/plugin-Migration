@@ -15,6 +15,7 @@ use Piwik\Plugins\Migration\tests\Fixtures\MigrationFixture;
 use Piwik\Config;
 use Piwik\Tests\Framework\Mock\FakeAccess;
 use Piwik\Tests\Framework\TestCase\ConsoleCommandTestCase;
+use Piwik\Version;
 
 /**
  * @group Migration
@@ -174,7 +175,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
     {
         $testEnv = self::$fixture->getTestEnvironment();
         $config = Config::getInstance();
-        foreach (array('database', 'database_tests') as $category) {
+        foreach (['database', 'database_tests'] as $category) {
             $testEnv->overrideConfig($category, 'tables_prefix', $prefix);
             $cat = $config->$category;
             $cat['tables_prefix'] = $prefix;
@@ -222,25 +223,32 @@ The following columns are missing in the target DB table "targetdb_log_action": 
 
     public function getApiForTesting()
     {
-        $api = array(
+        $apis = [
             'API.get',
             'Live.getLastVisitsDetails',
             'Actions.getPageUrls',
             'SitesManager.getSiteFromId',
             'Goals.getGoals',
             'CustomDimensions.getConfiguredCustomDimensions',
-        );
+        ];
 
-        $apiToTest   = array();
-        $apiToTest[] = array($api,
-            array(
-                'idSite'     => 1,
-                'date'       => self::$fixture->dateTime,
-                'periods'    => array('day', 'year'),
-                'testSuffix' => '',
-                'xmlFieldsToRemove' => array('pageIdAction')
-            )
-        );
+        $apiToTest   = [];
+        foreach ($apis as $api) {
+            $testSuffix = '';
+            if (in_array($api, ['Actions.getPageUrls','CustomDimensions.getConfiguredCustomDimensions'])) {
+                $testSuffix = version_compare(Version::VERSION, '4.13.0-b1', '<=') ? 'Old' : '';
+            }
+            $api = [$api];
+            $apiToTest[] = [$api,
+                [
+                    'idSite' => 1,
+                    'date' => self::$fixture->dateTime,
+                    'periods' => ['day', 'year'],
+                    'testSuffix' => $testSuffix,
+                    'xmlFieldsToRemove' => ['pageIdAction']
+                ]
+            ];
+        }
 
         return $apiToTest;
     }
@@ -248,7 +256,7 @@ The following columns are missing in the target DB table "targetdb_log_action": 
     private function runCommand()
     {
         $config = Db::getDatabaseConfig();
-        $result = $this->applicationTester->run(array(
+        $result = $this->applicationTester->run([
             'command' => 'migration:measurable',
             '--source-idsite' => 1,
             '--target-db-host' => $config['host'],
@@ -257,7 +265,7 @@ The following columns are missing in the target DB table "targetdb_log_action": 
             '--target-db-name' => $config['dbname'],
             '--target-db-prefix' => MigrationFixture::TARGET_DB_PREFIX,
             '--no-interaction' => true,
-        ));
+        ]);
         return $result;
     }
 

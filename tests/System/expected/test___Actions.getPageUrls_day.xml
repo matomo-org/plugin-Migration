@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0"?>
 <result>
 	<row>
 		<label>sub</label>
@@ -7,23 +7,14 @@
 		<sum_time_spent>360</sum_time_spent>
 		<sum_bandwidth>0</sum_bandwidth>
 		<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
-		<min_bandwidth />
-		<max_bandwidth />
+		<min_bandwidth/>
+		<max_bandwidth/>
 		<entry_nb_visits>1</entry_nb_visits>
 		<entry_nb_actions>2</entry_nb_actions>
 		<entry_sum_visit_length>721</entry_sum_visit_length>
 		<entry_bounce_count>0</entry_bounce_count>
 		<exit_nb_visits>1</exit_nb_visits>
 		<goals>
-			<row idgoal="ecommerceOrder">
-				<nb_conversions>1</nb_conversions>
-				<revenue>2541</revenue>
-				<nb_conv_pages_before>2</nb_conv_pages_before>
-				<nb_conversions_attrib>0.5</nb_conversions_attrib>
-				<nb_conversions_page_rate>1</nb_conversions_page_rate>
-				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
-				<revenue_attrib>1270.5</revenue_attrib>
-			</row>
 			<row idgoal="1">
 				<nb_conversions>1</nb_conversions>
 				<revenue>5</revenue>
@@ -32,6 +23,24 @@
 				<nb_conversions_page_rate>1</nb_conversions_page_rate>
 				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 				<revenue_attrib>2.5</revenue_attrib>
+			</row>
+			<row idgoal="ecommerceAbandonedCart">
+				<nb_conversions>1</nb_conversions>
+				<revenue>2541</revenue>
+				<nb_conv_pages_before>1</nb_conv_pages_before>
+				<nb_conversions_attrib>1</nb_conversions_attrib>
+				<nb_conversions_page_rate>1</nb_conversions_page_rate>
+				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
+				<revenue_attrib>2541</revenue_attrib>
+			</row>
+			<row idgoal="ecommerceOrder">
+				<nb_conversions>1</nb_conversions>
+				<revenue>2541</revenue>
+				<nb_conv_pages_before>2</nb_conv_pages_before>
+				<nb_conversions_attrib>0.5</nb_conversions_attrib>
+				<nb_conversions_page_rate>1</nb_conversions_page_rate>
+				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
+				<revenue_attrib>1270.5</revenue_attrib>
 			</row>
 		</goals>
 		<avg_bandwidth>0</avg_bandwidth>
@@ -49,8 +58,8 @@
 				<sum_time_spent>360</sum_time_spent>
 				<sum_bandwidth>0</sum_bandwidth>
 				<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
-				<min_bandwidth />
-				<max_bandwidth />
+				<min_bandwidth/>
+				<max_bandwidth/>
 				<entry_nb_uniq_visitors>1</entry_nb_uniq_visitors>
 				<entry_nb_visits>1</entry_nb_visits>
 				<entry_nb_actions>2</entry_nb_actions>
@@ -59,15 +68,6 @@
 				<exit_nb_uniq_visitors>1</exit_nb_uniq_visitors>
 				<exit_nb_visits>1</exit_nb_visits>
 				<goals>
-					<row idgoal="ecommerceOrder">
-						<nb_conversions>1</nb_conversions>
-						<revenue>2541</revenue>
-						<nb_conv_pages_before>2</nb_conv_pages_before>
-						<nb_conversions_attrib>0.5</nb_conversions_attrib>
-						<nb_conversions_page_rate>0</nb_conversions_page_rate>
-						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
-						<revenue_attrib>1270.5</revenue_attrib>
-					</row>
 					<row idgoal="1">
 						<nb_conversions>1</nb_conversions>
 						<revenue>5</revenue>
@@ -76,6 +76,24 @@
 						<nb_conversions_page_rate>0</nb_conversions_page_rate>
 						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 						<revenue_attrib>2.5</revenue_attrib>
+					</row>
+					<row idgoal="ecommerceAbandonedCart">
+						<nb_conversions>1</nb_conversions>
+						<revenue>2541</revenue>
+						<nb_conv_pages_before>1</nb_conv_pages_before>
+						<nb_conversions_attrib>1</nb_conversions_attrib>
+						<nb_conversions_page_rate>0</nb_conversions_page_rate>
+						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
+						<revenue_attrib>2541</revenue_attrib>
+					</row>
+					<row idgoal="ecommerceOrder">
+						<nb_conversions>1</nb_conversions>
+						<revenue>2541</revenue>
+						<nb_conv_pages_before>2</nb_conv_pages_before>
+						<nb_conversions_attrib>0.5</nb_conversions_attrib>
+						<nb_conversions_page_rate>0</nb_conversions_page_rate>
+						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
+						<revenue_attrib>1270.5</revenue_attrib>
 					</row>
 				</goals>
 				<avg_time_on_page>180</avg_time_on_page>
@@ -94,27 +112,14 @@
 		<sum_time_spent>360</sum_time_spent>
 		<sum_bandwidth>0</sum_bandwidth>
 		<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
-		<min_bandwidth />
-		<max_bandwidth />
+		<min_bandwidth/>
+		<max_bandwidth/>
 		<entry_nb_uniq_visitors>1</entry_nb_uniq_visitors>
 		<entry_nb_visits>1</entry_nb_visits>
 		<entry_nb_actions>2</entry_nb_actions>
 		<entry_sum_visit_length>544</entry_sum_visit_length>
 		<entry_bounce_count>0</entry_bounce_count>
 		<goals>
-			<row idgoal="ecommerceOrder">
-				<nb_conversions>1</nb_conversions>
-				<revenue>2541</revenue>
-				<nb_conv_pages_before>2</nb_conv_pages_before>
-				<nb_conversions_attrib>0.5</nb_conversions_attrib>
-				<nb_conversions_page_rate>1</nb_conversions_page_rate>
-				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
-				<revenue_attrib>1270.5</revenue_attrib>
-				<revenue_entry>2541</revenue_entry>
-				<nb_conversions_entry_rate>1</nb_conversions_entry_rate>
-				<revenue_per_entry>2541</revenue_per_entry>
-				<nb_conversions_entry>1</nb_conversions_entry>
-			</row>
 			<row idgoal="1">
 				<nb_conversions>1</nb_conversions>
 				<revenue>5</revenue>
@@ -126,6 +131,19 @@
 				<revenue_entry>5</revenue_entry>
 				<nb_conversions_entry_rate>1</nb_conversions_entry_rate>
 				<revenue_per_entry>5</revenue_per_entry>
+				<nb_conversions_entry>1</nb_conversions_entry>
+			</row>
+			<row idgoal="ecommerceOrder">
+				<nb_conversions>1</nb_conversions>
+				<revenue>2541</revenue>
+				<nb_conv_pages_before>2</nb_conv_pages_before>
+				<nb_conversions_attrib>0.5</nb_conversions_attrib>
+				<nb_conversions_page_rate>1</nb_conversions_page_rate>
+				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
+				<revenue_attrib>1270.5</revenue_attrib>
+				<revenue_entry>2541</revenue_entry>
+				<nb_conversions_entry_rate>1</nb_conversions_entry_rate>
+				<revenue_per_entry>2541</revenue_per_entry>
 				<nb_conversions_entry>1</nb_conversions_entry>
 			</row>
 		</goals>
