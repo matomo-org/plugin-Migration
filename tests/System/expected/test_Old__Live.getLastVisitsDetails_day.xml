@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<result>
+	<row>
+		<idSite>1</idSite>
+		<idVisit>2</idVisit>
+		<visitIp>56.11.55.73</visitIp>
+		
+		<fingerprint>3d7de8315a349072</fingerprint>
+		<actionDetails>
+			<row>
+				<type>action</type>
+				<url>http://example.com/sub/page</url>
+				<pageTitle>Viewing homepage</pageTitle>
+				
+				
+				
+				<pageId>3</pageId>
+				<bandwidth />
+				<timeSpent>360</timeSpent>
+				<timeSpentPretty>6 min 0s</timeSpentPretty>
+				<pageviewPosition>1</pageviewPosition>
+				<title>Viewing homepage</title>
+				<subtitle>http://example.com/sub/page</subtitle>
+				<icon />
+				<iconSVG>plugins/Morpheus/images/action.svg</iconSVG>
+				
+				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
+			</row>
+			<row>
+				<type>search</type>
+				<url />
+				
+				
+				
+				<pageId>4</pageId>
+				<bandwidth />
+				<timeSpent>361</timeSpent>
+				<timeSpentPretty>6 min 1s</timeSpentPretty>
+				<siteSearchKeyword>this is a site search query</siteSearchKeyword>
+				<siteSearchCategory />
+				<siteSearchCount />
+				<pageviewPosition>2</pageviewPosition>
+				<icon>plugins/Morpheus/images/search.png</icon>
+				<iconSVG>plugins/Morpheus/images/search.svg</iconSVG>
+				<title>Site Search</title>
+				<subtitle>this is a site search query</subtitle>
+				
+				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
+			</row>
+			<row>
+				<type>ecommerceAbandonedCart</type>
+				<revenue>2541</revenue>
+				<items>1</items>
+				
+				
+				<itemDetails>
+					<row>
+						<itemSKU>SKU_ID2</itemSKU>
+						<itemName>A durable item</itemName>
+						<itemCategory>Best seller</itemCategory>
+						<price>321</price>
+						<quantity>1</quantity>
+						<categories>
+						<row>Best seller</row>
+						</categories>
+					</row>
+				</itemDetails>
+				<icon>plugins/Morpheus/images/ecommerceAbandonedCart.png</icon>
+				<iconSVG>plugins/Morpheus/images/ecommerceAbandonedCart.svg</iconSVG>
+				<title>Abandoned Cart</title>
+				<subtitle>$2,541 revenue - 1 items: A durable item)</subtitle>
+				
+				<dimension2 />
+			</row>
+		</actionDetails>
+		<goalConversions>0</goalConversions>
+		<siteCurrency>USD</siteCurrency>
+		<siteCurrencySymbol>$</siteCurrencySymbol>
+		
+		
+		
+		
+		<siteName>MigrationSite</siteName>
+		
+		
+		
+		
+		
+		
+		<userId />
+		<visitorType>new</visitorType>
+		<visitorTypeIcon />
+		<visitConverted>0</visitConverted>
+		<visitConvertedIcon />
+		<visitCount>1</visitCount>
+		<visitEcommerceStatus>abandonedCart</visitEcommerceStatus>
+		<visitEcommerceStatusIcon>plugins/Morpheus/images/ecommerceAbandonedCart.svg</visitEcommerceStatusIcon>
+		<daysSinceFirstVisit>0</daysSinceFirstVisit>
+		<secondsSinceFirstVisit>0</secondsSinceFirstVisit>
+		<daysSinceLastEcommerceOrder>0</daysSinceLastEcommerceOrder>
+		<secondsSinceLastEcommerceOrder />
+		<visitDuration>721</visitDuration>
+		<visitDurationPretty>12 min 1s</visitDurationPretty>
+		<searches>1</searches>
+		<actions>2</actions>
+		<interactions>2</interactions>
+		<referrerType>direct</referrerType>
+		<referrerTypeName>Direct Entry</referrerTypeName>
+		<referrerName />
+		<referrerKeyword />
+		<referrerKeywordPosition />
+		<referrerUrl />
+		<referrerSearchEngineUrl />
+		<referrerSearchEngineIcon />
+		<referrerSocialNetworkUrl />
+		<referrerSocialNetworkIcon />
+		<languageCode>fr</languageCode>
+		<language>French</language>
+		<deviceType>Desktop</deviceType>
+		<deviceTypeIcon>plugins/Morpheus/icons/dist/devices/desktop.png</deviceTypeIcon>
+		<deviceBrand>Unknown</deviceBrand>
+		<deviceModel>Generic Desktop</deviceModel>
+		<operatingSystem>Windows XP</operatingSystem>
+		<operatingSystemName>Windows</operatingSystemName>
+		<operatingSystemIcon>plugins/Morpheus/icons/dist/os/WIN.png</operatingSystemIcon>
+		<operatingSystemCode>WIN</operatingSystemCode>
+		<operatingSystemVersion>XP</operatingSystemVersion>
+		<browserFamily>Gecko</browserFamily>
+		<browserFamilyDescription>Gecko (Firefox)</browserFamilyDescription>
+		<browser>Firefox 3.6</browser>
+		<browserName>Firefox</browserName>
+		<browserIcon>plugins/Morpheus/icons/dist/browsers/FF.png</browserIcon>
+		<browserCode>FF</browserCode>
+		<browserVersion>3.6</browserVersion>
+		<totalEcommerceRevenue>0</totalEcommerceRevenue>
+		<totalEcommerceConversions>0</totalEcommerceConversions>
+		<totalEcommerceItems>0</totalEcommerceItems>
+		<totalAbandonedCartsRevenue>2541</totalAbandonedCartsRevenue>
+		<totalAbandonedCarts>1</totalAbandonedCarts>
+		<totalAbandonedCartsItems>1</totalAbandonedCartsItems>
+		<events>0</events>
+		<continent>Europe</continent>
+		<continentCode>eur</continentCode>
+		<country>France</country>
+		<countryCode>fr</countryCode>
+		<countryFlag>plugins/Morpheus/icons/dist/flags/fr.png</countryFlag>
+		<region />
+		<regionCode />
+		<city />
+		<location>France</location>
+		<latitude />
+		<longitude />
+		<visitLocalTime>12:34:06</visitLocalTime>
+		<visitLocalHour>12</visitLocalHour>
+		<daysSinceLastVisit>0</daysSinceLastVisit>
+		<secondsSinceLastVisit>0</secondsSinceLastVisit>
+		<resolution>1024x768</resolution>
+		<plugins>cookie, flash, java</plugins>
+		<pluginsIcons>
+			<row>
+				<pluginIcon>plugins/Morpheus/icons/dist/plugins/cookie.png</pluginIcon>
+				<pluginName>cookie</pluginName>
+			</row>
+			<row>
+				<pluginIcon>plugins/Morpheus/icons/dist/plugins/flash.png</pluginIcon>
+				<pluginName>flash</pluginName>
+			</row>
+			<row>
+				<pluginIcon>plugins/Morpheus/icons/dist/plugins/java.png</pluginIcon>
+				<pluginName>java</pluginName>
+			</row>
+		</pluginsIcons>
+		<dimension1 />
+		<customVariables>
+		</customVariables>
+	</row>
+	<row>
+		<idSite>1</idSite>
+		<idVisit>1</idVisit>
+		<visitIp>156.5.3.2</visitIp>
+		
+		<fingerprint>e16cf2bbaeea2c88</fingerprint>
+		<actionDetails>
+			<row>
+				<type>action</type>
+				<url>http://example.com/</url>
+				<pageTitle>Viewing homepage</pageTitle>
+				
+				
+				
+				<pageId>1</pageId>
+				<bandwidth />
+				<timeSpent>360</timeSpent>
+				<timeSpentPretty>6 min 0s</timeSpentPretty>
+				<pageviewPosition>1</pageviewPosition>
+				<title>Viewing homepage</title>
+				<subtitle>http://example.com/</subtitle>
+				<icon />
+				<iconSVG>plugins/Morpheus/images/action.svg</iconSVG>
+				
+				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
+			</row>
+			<row>
+				<type>action</type>
+				<url>http://example.com/sub/page</url>
+				<pageTitle>Second page view</pageTitle>
+				
+				
+				
+				<pageId>2</pageId>
+				<bandwidth />
+				<timeSpent>184</timeSpent>
+				<timeSpentPretty>3 min 4s</timeSpentPretty>
+				<pageviewPosition>2</pageviewPosition>
+				<title>Second page view</title>
+				<subtitle>http://example.com/sub/page</subtitle>
+				<icon />
+				<iconSVG>plugins/Morpheus/images/action.svg</iconSVG>
+				
+				<dimension2 />
+				<bandwidth_pretty>0 M</bandwidth_pretty>
+			</row>
+			<row>
+				<type>ecommerceOrder</type>
+				<orderId>TestingOrder</orderId>
+				<revenue>2541</revenue>
+				<revenueSubTotal>0</revenueSubTotal>
+				<revenueTax>0</revenueTax>
+				<revenueShipping>0</revenueShipping>
+				<revenueDiscount>0</revenueDiscount>
+				<items>33</items>
+				
+				
+				<itemDetails>
+					<row>
+						<itemSKU>SKU_ID</itemSKU>
+						<itemName>Test item!</itemName>
+						<itemCategory>Test &amp; Category</itemCategory>
+						<price>777</price>
+						<quantity>33</quantity>
+						<categories>
+						<row>Test &amp; Category</row>
+						</categories>
+					</row>
+				</itemDetails>
+				<icon>plugins/Morpheus/images/ecommerceOrder.png</icon>
+				<iconSVG>plugins/Morpheus/images/ecommerceOrder.svg</iconSVG>
+				<title>Ordered (TestingOrder)</title>
+				<subtitle>$2,541 revenue - 33 items: Test item!)</subtitle>
+				
+				<dimension2 />
+			</row>
+			<row>
+				<type>goal</type>
+				<goalName>Download Software</goalName>
+				<goalId>1</goalId>
+				
+				<revenue>5</revenue>
+				<goalPageId />
+				
+				<url>http://example.com/sub/page</url>
+				<icon>plugins/Morpheus/images/goal.png</icon>
+				<iconSVG>plugins/Morpheus/images/goal.svg</iconSVG>
+				<title>Goal conversion</title>
+				<subtitle>Download Software ($5 revenue)</subtitle>
+				
+				<dimension2 />
+			</row>
+		</actionDetails>
+		<goalConversions>1</goalConversions>
+		<siteCurrency>USD</siteCurrency>
+		<siteCurrencySymbol>$</siteCurrencySymbol>
+		
+		
+		
+		
+		<siteName>MigrationSite</siteName>
+		
+		
+		
+		
+		
+		
+		<userId />
+		<visitorType>new</visitorType>
+		<visitorTypeIcon />
+		<visitConverted>1</visitConverted>
+		<visitConvertedIcon>plugins/Morpheus/images/goal.svg</visitConvertedIcon>
+		<visitCount>1</visitCount>
+		<visitEcommerceStatus>ordered</visitEcommerceStatus>
+		<visitEcommerceStatusIcon>plugins/Morpheus/images/ecommerceOrder.svg</visitEcommerceStatusIcon>
+		<daysSinceFirstVisit>0</daysSinceFirstVisit>
+		<secondsSinceFirstVisit>0</secondsSinceFirstVisit>
+		<daysSinceLastEcommerceOrder>0</daysSinceLastEcommerceOrder>
+		<secondsSinceLastEcommerceOrder>0</secondsSinceLastEcommerceOrder>
+		<visitDuration>544</visitDuration>
+		<visitDurationPretty>9 min 4s</visitDurationPretty>
+		<searches>0</searches>
+		<actions>2</actions>
+		<interactions>2</interactions>
+		<referrerType>direct</referrerType>
+		<referrerTypeName>Direct Entry</referrerTypeName>
+		<referrerName />
+		<referrerKeyword />
+		<referrerKeywordPosition />
+		<referrerUrl />
+		<referrerSearchEngineUrl />
+		<referrerSearchEngineIcon />
+		<referrerSocialNetworkUrl />
+		<referrerSocialNetworkIcon />
+		<languageCode>fr</languageCode>
+		<language>French</language>
+		<deviceType>Desktop</deviceType>
+		<deviceTypeIcon>plugins/Morpheus/icons/dist/devices/desktop.png</deviceTypeIcon>
+		<deviceBrand>Unknown</deviceBrand>
+		<deviceModel>Generic Desktop</deviceModel>
+		<operatingSystem>Windows XP</operatingSystem>
+		<operatingSystemName>Windows</operatingSystemName>
+		<operatingSystemIcon>plugins/Morpheus/icons/dist/os/WIN.png</operatingSystemIcon>
+		<operatingSystemCode>WIN</operatingSystemCode>
+		<operatingSystemVersion>XP</operatingSystemVersion>
+		<browserFamily>Gecko</browserFamily>
+		<browserFamilyDescription>Gecko (Firefox)</browserFamilyDescription>
+		<browser>Firefox 3.6</browser>
+		<browserName>Firefox</browserName>
+		<browserIcon>plugins/Morpheus/icons/dist/browsers/FF.png</browserIcon>
+		<browserCode>FF</browserCode>
+		<browserVersion>3.6</browserVersion>
+		<totalEcommerceRevenue>2541</totalEcommerceRevenue>
+		<totalEcommerceConversions>1</totalEcommerceConversions>
+		<totalEcommerceItems>33</totalEcommerceItems>
+		<totalAbandonedCartsRevenue>0</totalAbandonedCartsRevenue>
+		<totalAbandonedCarts>0</totalAbandonedCarts>
+		<totalAbandonedCartsItems>0</totalAbandonedCartsItems>
+		<events>0</events>
+		<continent>Europe</continent>
+		<continentCode>eur</continentCode>
+		<country>France</country>
+		<countryCode>fr</countryCode>
+		<countryFlag>plugins/Morpheus/icons/dist/flags/fr.png</countryFlag>
+		<region />
+		<regionCode />
+		<city />
+		<location>France</location>
+		<latitude />
+		<longitude />
+		<visitLocalTime>12:34:06</visitLocalTime>
+		<visitLocalHour>12</visitLocalHour>
+		<daysSinceLastVisit>0</daysSinceLastVisit>
+		<secondsSinceLastVisit>0</secondsSinceLastVisit>
+		<resolution>1024x768</resolution>
+		<plugins>cookie, flash, java</plugins>
+		<pluginsIcons>
+			<row>
+				<pluginIcon>plugins/Morpheus/icons/dist/plugins/cookie.png</pluginIcon>
+				<pluginName>cookie</pluginName>
+			</row>
+			<row>
+				<pluginIcon>plugins/Morpheus/icons/dist/plugins/flash.png</pluginIcon>
+				<pluginName>flash</pluginName>
+			</row>
+			<row>
+				<pluginIcon>plugins/Morpheus/icons/dist/plugins/java.png</pluginIcon>
+				<pluginName>java</pluginName>
+			</row>
+		</pluginsIcons>
+		<dimension1 />
+		<customVariables>
+		</customVariables>
+	</row>
+</result>
