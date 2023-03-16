@@ -44,6 +44,12 @@ class Migrate extends ConsoleCommand
         $this->addOption('disable-db-transactions', null, InputOption::VALUE_NONE, 'Disable the usage of MySQL database transactions');
     }
 
+    /**
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int
+     */
+
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->checkAllRequiredOptionsAreNotEmpty($input);
@@ -63,7 +69,7 @@ class Migrate extends ConsoleCommand
 
         $noInteraction = $input->getOption('no-interaction');
         if (!$noInteraction && !$this->confirmMigration($output, $idSite)) {
-            return;
+            return self::SUCCESS;
         }
 
         $this->output = $output;
@@ -93,6 +99,8 @@ class Migrate extends ConsoleCommand
         }
         $migrations->onLog(array($this, 'logMessage'));
         $migrations->migrate($allMigrations, $request, $targetDb);
+
+        return self::SUCCESS;
     }
 
     public function logMessage($message)
