@@ -124,13 +124,8 @@ class Migrate extends ConsoleCommand
         ));
     }
 
-    private function confirmMigration($idSite)
+    private function confirmMigration($idSite): bool
     {
-        $dialog = $this->getHelperSet()->get('dialog');
-        return $dialog->askConfirmation(
-            $this->getOutput(),
-            '<question>Are you sure you want to migrate the data for idSite '.(int) $idSite.'. (y/N)</question>',
-            false
-        );
+        return $this->askForConfirmation('<question>Are you sure you want to migrate the data for idSite '.(int) $idSite.'. (y/N)</question>');
     }
 }
