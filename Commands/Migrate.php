@@ -15,48 +15,40 @@ use Piwik\Plugins\Migration\Migrations\Provider;
 use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\TargetDb;
 use Piwik\Site;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\OutputInterface;
 
 class Migrate extends ConsoleCommand
 {
-    /**
-     * @var OutputInterface
-     */
-    private $output;
-
     protected function configure()
     {
         $this->setName('migration:measurable');
         $this->setDescription('Migrates a measurable/website from one Matomo instance to another Matomo');
 
-        $this->addOption('source-idsite', null,InputOption::VALUE_REQUIRED, 'Source Site ID you want to migrate');
-        $this->addOption('target-db-host', null, InputOption::VALUE_REQUIRED, 'Target database host');
-        $this->addOption('target-db-username', null, InputOption::VALUE_REQUIRED, 'Target database username');
-        $this->addOption('target-db-password', null, InputOption::VALUE_OPTIONAL, 'Target database password');
-        $this->addOption('target-db-name', null, InputOption::VALUE_REQUIRED, 'Target database name');
-        $this->addOption('target-db-prefix', null, InputOption::VALUE_OPTIONAL, 'Target database table prefix', '');
-        $this->addOption('target-db-port', null, InputOption::VALUE_REQUIRED, 'Target database port', '3306');
-        $this->addOption('skip-logs', null, InputOption::VALUE_NONE, 'Skip migration of logs');
-        $this->addOption('skip-archives', null, InputOption::VALUE_NONE, 'Skip migration of archives');
-        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Enable debug mode where it does not insert anything.');
-        $this->addOption('disable-db-transactions', null, InputOption::VALUE_NONE, 'Disable the usage of MySQL database transactions');
+        $this->addRequiredValueOption('source-idsite', null, 'Source Site ID you want to migrate');
+        $this->addRequiredValueOption('target-db-host', null, 'Target database host');
+        $this->addRequiredValueOption('target-db-username', null, 'Target database username');
+        $this->addOptionalValueOption('target-db-password', null, 'Target database password');
+        $this->addRequiredValueOption('target-db-name', null, 'Target database name');
+        $this->addOptionalValueOption('target-db-prefix', null, 'Target database table prefix', '');
+        $this->addRequiredValueOption('target-db-port', null, 'Target database port', '3306');
+        $this->addNoValueOption('skip-logs', null, 'Skip migration of logs');
+        $this->addNoValueOption('skip-archives', null, 'Skip migration of archives');
+        $this->addNoValueOption('dry-run', null, 'Enable debug mode where it does not insert anything.');
+        $this->addNoValueOption('disable-db-transactions', null, 'Disable the usage of MySQL database transactions');
     }
 
     /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
      * @return int
      */
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function doExecute(): int
     {
-        $this->checkAllRequiredOptionsAreNotEmpty($input);
+        $input = $this->getInput();
+        $output = $this->getOutput();
+        $this->checkAllRequiredOptionsAreNotEmpty();
         $idSite = (int) $input->getOption('source-idsite');
 
         $this->checkSiteExists($idSite);
-        $targetDb = $this->makeTargetDb($input);
+        $targetDb = $this->makeTargetDb();
 
         if ($input->getOption('disable-db-transactions')) {
             $targetDb->disableTransactions();
@@ -68,11 +60,9 @@ class Migrate extends ConsoleCommand
         }
 
         $noInteraction = $input->getOption('no-interaction');
-        if (!$noInteraction && !$this->confirmMigration($output, $idSite)) {
+        if (!$noInteraction && !$this->confirmMigration($idSite)) {
             return self::SUCCESS;
         }
-
-        $this->output = $output;
 
         $errors = array();
 
@@ -110,7 +100,7 @@ class Migrate extends ConsoleCommand
         } else {
             $now = Date::now()->getDatetime();
         }
-        $this->output->writeln($message . ' at ' . $now);
+        $this->getOutput()->writeln($message . ' at ' . $now);
     }
 
     private function checkSiteExists($idSite)
@@ -119,11 +109,11 @@ class Migrate extends ConsoleCommand
     }
 
     /**
-     * @param InputInterface $input
      * @return TargetDb
      */
-    private function makeTargetDb(InputInterface $input)
+    private function makeTargetDb()
     {
+        $input = $this->getInput();
         return new TargetDb(array(
             'host' => $input->getOption('target-db-host'),
             'username' => $input->getOption('target-db-username'),
@@ -134,11 +124,11 @@ class Migrate extends ConsoleCommand
         ));
     }
 
-    private function confirmMigration(OutputInterface $output, $idSite)
+    private function confirmMigration($idSite)
     {
         $dialog = $this->getHelperSet()->get('dialog');
         return $dialog->askConfirmation(
-            $output,
+            $this->getOutput(),
             '<question>Are you sure you want to migrate the data for idSite '.(int) $idSite.'. (y/N)</question>',
             false
         );
