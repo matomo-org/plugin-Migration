@@ -21,7 +21,7 @@ class TargetDb
      */
     private $db;
 
-    private $config = array();
+    private $config = [];
 
     private $dryRun = false;
 
@@ -70,7 +70,7 @@ class TargetDb
         }
     }
 
-    public function fetchRow($sql, $bind = array(), $fetchMode = null)
+    public function fetchRow($sql, $bind = [], $fetchMode = null)
     {
         return $this->db->fetchRow($sql, $bind, $fetchMode);
     }
@@ -85,9 +85,9 @@ class TargetDb
 
     public function getTableColumns($tableName)
     {
-        $allColumns = $this->db->fetchAll("SHOW COLUMNS FROM " . $tableName);
+        $allColumns = $this->db->fetchAll("SHOW COLUMNS FROM `$tableName`");
 
-        $fields = array();
+        $fields = [];
         foreach ($allColumns as $column) {
             $fields[trim($column['Field'])] = $column;
         }
@@ -138,7 +138,7 @@ class TargetDb
                 if (!$this->dryRun) {
                     $sequenceTable = $this->prefixTable(Sequence::TABLE_NAME);
                     // we also do +1 if the value is already high just to be safe...
-                    $this->db->query('UPDATE ' . $sequenceTable . ' SET `value` = if(`value` < ?, ?, value + 1) WHERE `name` = ?', array($val, $val, $targetDbTableName));
+                    $this->db->query("UPDATE `$sequenceTable` SET `value` = if(`value` < ?, ?, value + 1) WHERE `name` = ?", [$val, $val, $targetDbTableName]);
                 }
             }
         }
@@ -146,7 +146,7 @@ class TargetDb
 
     public function getMaxArchiveId($targetDbTableNamePrefixed)
     {
-        $val = $this->db->fetchOne('SELECT max(idarchive) FROM '.$targetDbTableNamePrefixed);
+        $val = $this->db->fetchOne("SELECT max(idarchive) FROM `$targetDbTableNamePrefixed`");
         if (empty($val)) {
             $val = 0;
         }
@@ -188,7 +188,7 @@ class TargetDb
 
         $tablePrefixed = $this->prefixTable($table);
 
-        $sql = sprintf('INSERT INTO %s (`%s`) VALUES(%s)', $tablePrefixed, $columns, $fields);
+        $sql = sprintf('INSERT INTO `%s` (`%s`) VALUES(%s)', $tablePrefixed, $columns, $fields);
         $bind = array_values($row);
 
         if ($this->dryRun) {
@@ -204,20 +204,20 @@ class TargetDb
     public function update($table, $columns, $whereColumns)
     {
         if (!empty($columns)) {
-            $fields = array();
-            $bind = array();
+            $fields = [];
+            $bind = [];
             foreach ($columns as $key => $value) {
-                $fields[] = ' ' . $key . ' = ?';
+                $fields[] = " `$key` = ?";
                 $bind[] = $value;
             }
             $fields = implode(',', $fields);
             $where = [];
             foreach ($whereColumns as $col => $val) {
-                $where[] = '`' . $col .'` = ?';
+                $where[] = " `$col` = ?";
                 $bind[] = $val;
             }
             $where = implode(' AND ', $where);
-            $query = sprintf('UPDATE %s SET %s WHERE %s', $this->prefixTable($table), $fields, $where);
+            $query = sprintf('UPDATE `%s` SET %s WHERE %s', $this->prefixTable($table), $fields, $where);
 
             $this->db->query($query, $bind);
         }
