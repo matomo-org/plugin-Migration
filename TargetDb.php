@@ -138,7 +138,7 @@ class TargetDb
                 if (!$this->dryRun) {
                     $sequenceTable = $this->prefixTable(Sequence::TABLE_NAME);
                     // we also do +1 if the value is already high just to be safe...
-                    $this->db->query("UPDATE `$sequenceTable` SET `value` = if(`value` < ?, ?, value + 1) WHERE `name` = ?", [$val, $val, $targetDbTableName]);
+                    $this->db->query("UPDATE `$sequenceTable` SET `value` = if(`value` < ?, ?, `value` + 1) WHERE `name` = ?", [$val, $val, $targetDbTableName]);
                 }
             }
         }
