@@ -1,5 +1,8 @@
 ## Changelog
 
+### 4.0.3
+- Security improvements in query builder
+
 ### 4.0.2
 - Support export from Matomo for WordPress
 
