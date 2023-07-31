@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.1
+- Second beta release
+
 ### 5.0.0
 - Compatibility with Matomo 5
 
