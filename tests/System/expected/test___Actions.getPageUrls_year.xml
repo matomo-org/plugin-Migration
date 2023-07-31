@@ -27,11 +27,8 @@
 			<row idgoal="ecommerceAbandonedCart">
 				<nb_conversions>1</nb_conversions>
 				<revenue>2541</revenue>
-				<nb_conv_pages_before>1</nb_conv_pages_before>
-				<nb_conversions_attrib>1</nb_conversions_attrib>
-				<nb_conversions_page_rate>1</nb_conversions_page_rate>
 				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
-				<revenue_attrib>2541</revenue_attrib>
+				<nb_conversions_page_rate>1</nb_conversions_page_rate>
 			</row>
 			<row idgoal="ecommerceOrder">
 				<nb_conversions>1</nb_conversions>
@@ -77,11 +74,7 @@
 					<row idgoal="ecommerceAbandonedCart">
 						<nb_conversions>1</nb_conversions>
 						<revenue>2541</revenue>
-						<nb_conv_pages_before>1</nb_conv_pages_before>
-						<nb_conversions_attrib>1</nb_conversions_attrib>
-						<nb_conversions_page_rate>0</nb_conversions_page_rate>
 						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
-						<revenue_attrib>2541</revenue_attrib>
 					</row>
 					<row idgoal="ecommerceOrder">
 						<nb_conversions>1</nb_conversions>
