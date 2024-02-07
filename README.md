@@ -32,12 +32,15 @@ To start a migration execute the `migration:measurable` command, example:
 Optional parameters are:
 
 ```
- --target-db-prefix=piwik_      Target database table prefix (default: "")
- --target-db-port=3306          Target database port (default: "3306")
- --skip-logs                    Skip migration of logs (Raw tracking data)
- --skip-archives                Skip migration of archives (Report data)
- --dry-run                      Enable debug mode where it does not insert anything.
- --disable-db-transactions      Disable the usage of MySQL database transactions
+ --target-db-prefix=piwik_                          Target database table prefix (default: "")
+ --target-db-port=3306                              Target database port (default: "3306")
+ --target-db-enable-ssl=1                           Used for establishing secure connections using SSL with target database host (default: 0)
+ --target-db-ssl-ca=/etc/ssl/certs/cert.pem         The path name to the certificate authority file (default: "/etc/ssl/certs/cert.pem")
+ --target-db-ssl-no-verify=1                        Disable server certificate validation of the target database (default: 0)
+ --skip-logs                                        Skip migration of logs (Raw tracking data)
+ --skip-archives                                    Skip migration of archives (Report data)
+ --dry-run                                          Enable debug mode where it does not insert anything.
+ --disable-db-transactions                          Disable the usage of MySQL database transactions
 ```
 
 Both Matomo instances may be on different servers with proper firewall rules that restrict database access on target instance.
