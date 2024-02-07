@@ -30,6 +30,9 @@ class Migrate extends ConsoleCommand
         $this->addRequiredValueOption('target-db-name', null, 'Target database name');
         $this->addOptionalValueOption('target-db-prefix', null, 'Target database table prefix', '');
         $this->addRequiredValueOption('target-db-port', null, 'Target database port', '3306');
+        $this->addOptionalValueOption('target-db-enable-ssl', null, 'Used for establishing secure connections using SSL with target database host.', 0);
+        $this->addOptionalValueOption('target-db-ssl-ca', null, 'The path name to the certificate authority file.', '/etc/ssl/certs/cert.pem');
+        $this->addOptionalValueOption('target-db-ssl-no-verify', null, 'Disable server certificate validation of the target database.', 0);
         $this->addNoValueOption('skip-logs', null, 'Skip migration of logs');
         $this->addNoValueOption('skip-archives', null, 'Skip migration of archives');
         $this->addNoValueOption('dry-run', null, 'Enable debug mode where it does not insert anything.');
@@ -121,6 +124,9 @@ class Migrate extends ConsoleCommand
             'dbname' => $input->getOption('target-db-name'),
             'tables_prefix' => $input->getOption('target-db-prefix'),
             'port' => $input->getOption('target-db-port'),
+            'enable_ssl' => $input->getOption('target-db-enable-ssl'),
+            'ssl_ca' => $input->getOption('target-db-ssl-ca'),
+            'ssl_no_verify' => $input->getOption('target-db-ssl-no-verify'),
         ));
     }
 
