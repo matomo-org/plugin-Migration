@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.2
+- Add optional parameters to support ssl
+
 ### 5.0.1
 - Second beta release
 
