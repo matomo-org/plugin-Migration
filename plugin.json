@@ -20,5 +20,6 @@
   ],
   "license": "GPL v3+",
   "homepage": "https:\/\/matomo.org",
-  "keywords": ["measurable", "site", "website", "migrate", "migration", "move", "copy"]
+  "keywords": ["measurable", "site", "website", "migrate", "migration", "move", "copy"],
+  "category": "development"
 }
