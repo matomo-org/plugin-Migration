@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.3
+- Added plugin category for Marketplace
+
 ### 5.0.2
 - Add optional parameters to support ssl
 
