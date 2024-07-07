@@ -51,8 +51,11 @@
 				<type>ecommerceAbandonedCart</type>
 				<revenue>2541</revenue>
 				<items>1</items>
-				
-				
+
+
+				<referrerType>direct</referrerType>
+				<referrerName/>
+				<referrerKeyword/>
 				<itemDetails>
 					<row>
 						<itemSKU>SKU_ID2</itemSKU>
@@ -230,8 +233,11 @@
 				<revenueShipping>0</revenueShipping>
 				<revenueDiscount>0</revenueDiscount>
 				<items>33</items>
-				
-				
+
+
+				<referrerType>direct</referrerType>
+				<referrerName/>
+				<referrerKeyword/>
 				<itemDetails>
 					<row>
 						<itemSKU>SKU_ID</itemSKU>
