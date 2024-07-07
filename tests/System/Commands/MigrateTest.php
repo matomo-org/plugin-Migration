@@ -148,7 +148,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         FakeAccess::clearAccess(true);
         $this->disableArchiving();
 
-        if ('Live.getLastVisitsDetails' === $api && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
+        if (['Live.getLastVisitsDetails'] === $api && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
             $params['testSuffix'] = '5-2a';
         }
         $this->runApiTests($api, $params);
@@ -166,7 +166,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
         FakeAccess::clearAccess($superUser = true);
 
-        if ('Live.getLastVisitsDetails' === $api && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
+        if (['Live.getLastVisitsDetails'] === $api && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
             $params['testSuffix'] = '5-2a';
         }
         try {
@@ -237,12 +237,8 @@ The following columns are missing in the target DB table "targetdb_log_action": 
             'SitesManager.getSiteFromId',
             'Goals.getGoals',
             'CustomDimensions.getConfiguredCustomDimensions',
+            'Live.getLastVisitsDetails',
         ];
-
-        // This one doesn't play nice with PHP 8 and earlier versions of Matomo. So, only include it for newer versions
-        if (version_compare(PHP_VERSION, '8.0.0', '<')) {
-            $apis[] = 'Live.getLastVisitsDetails';
-        }
 
         $apiToTest   = [];
         foreach ($apis as $api) {
