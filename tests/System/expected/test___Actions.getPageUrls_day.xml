@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <result>
 	<row>
 		<label>sub</label>
@@ -7,15 +7,15 @@
 		<sum_time_spent>360</sum_time_spent>
 		<sum_bandwidth>0</sum_bandwidth>
 		<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
-		<min_bandwidth/>
-		<max_bandwidth/>
+		<min_bandwidth />
+		<max_bandwidth />
 		<entry_nb_visits>1</entry_nb_visits>
 		<entry_nb_actions>2</entry_nb_actions>
 		<entry_sum_visit_length>721</entry_sum_visit_length>
 		<entry_bounce_count>0</entry_bounce_count>
 		<exit_nb_visits>1</exit_nb_visits>
 		<goals>
-			<row idgoal="1">
+			<row idgoal='1'>
 				<nb_conversions>1</nb_conversions>
 				<revenue>5</revenue>
 				<nb_conv_pages_before>2</nb_conv_pages_before>
@@ -24,13 +24,13 @@
 				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 				<revenue_attrib>2.5</revenue_attrib>
 			</row>
-			<row idgoal="ecommerceAbandonedCart">
+			<row idgoal='ecommerceAbandonedCart'>
 				<nb_conversions>1</nb_conversions>
 				<revenue>2541</revenue>
 				<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 				<nb_conversions_page_rate>1</nb_conversions_page_rate>
 			</row>
-			<row idgoal="ecommerceOrder">
+			<row idgoal='ecommerceOrder'>
 				<nb_conversions>1</nb_conversions>
 				<revenue>2541</revenue>
 				<nb_conv_pages_before>2</nb_conv_pages_before>
@@ -55,8 +55,8 @@
 				<sum_time_spent>360</sum_time_spent>
 				<sum_bandwidth>0</sum_bandwidth>
 				<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
-				<min_bandwidth/>
-				<max_bandwidth/>
+				<min_bandwidth />
+				<max_bandwidth />
 				<entry_nb_uniq_visitors>1</entry_nb_uniq_visitors>
 				<entry_nb_visits>1</entry_nb_visits>
 				<entry_nb_actions>2</entry_nb_actions>
@@ -65,7 +65,7 @@
 				<exit_nb_uniq_visitors>1</exit_nb_uniq_visitors>
 				<exit_nb_visits>1</exit_nb_visits>
 				<goals>
-					<row idgoal="1">
+					<row idgoal='1'>
 						<nb_conversions>1</nb_conversions>
 						<revenue>5</revenue>
 						<nb_conv_pages_before>2</nb_conv_pages_before>
@@ -74,12 +74,12 @@
 						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 						<revenue_attrib>2.5</revenue_attrib>
 					</row>
-					<row idgoal="ecommerceAbandonedCart">
+					<row idgoal='ecommerceAbandonedCart'>
 						<nb_conversions>1</nb_conversions>
 						<revenue>2541</revenue>
 						<nb_conversions_page_uniq>1</nb_conversions_page_uniq>
 					</row>
-					<row idgoal="ecommerceOrder">
+					<row idgoal='ecommerceOrder'>
 						<nb_conversions>1</nb_conversions>
 						<revenue>2541</revenue>
 						<nb_conv_pages_before>2</nb_conv_pages_before>
@@ -105,15 +105,15 @@
 		<sum_time_spent>360</sum_time_spent>
 		<sum_bandwidth>0</sum_bandwidth>
 		<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
-		<min_bandwidth/>
-		<max_bandwidth/>
+		<min_bandwidth />
+		<max_bandwidth />
 		<entry_nb_uniq_visitors>1</entry_nb_uniq_visitors>
 		<entry_nb_visits>1</entry_nb_visits>
 		<entry_nb_actions>2</entry_nb_actions>
 		<entry_sum_visit_length>544</entry_sum_visit_length>
 		<entry_bounce_count>0</entry_bounce_count>
 		<goals>
-			<row idgoal="1">
+			<row idgoal='1'>
 				<nb_conversions>1</nb_conversions>
 				<revenue>5</revenue>
 				<nb_conv_pages_before>2</nb_conv_pages_before>
@@ -126,7 +126,7 @@
 				<revenue_per_entry>5</revenue_per_entry>
 				<nb_conversions_entry>1</nb_conversions_entry>
 			</row>
-			<row idgoal="ecommerceOrder">
+			<row idgoal='ecommerceOrder'>
 				<nb_conversions>1</nb_conversions>
 				<revenue>2541</revenue>
 				<nb_conv_pages_before>2</nb_conv_pages_before>
