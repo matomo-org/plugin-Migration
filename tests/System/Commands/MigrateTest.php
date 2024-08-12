@@ -148,9 +148,10 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         FakeAccess::clearAccess(true);
         $this->disableArchiving();
 
-        if (['Live.getLastVisitsDetails'] === $api && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
+        if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
             $params['testSuffix'] = '5-2a';
         }
+
         $this->runApiTests($api, $params);
     }
 
@@ -166,7 +167,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
         FakeAccess::clearAccess($superUser = true);
 
-        if (['Live.getLastVisitsDetails'] === $api && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
+        if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
             $params['testSuffix'] = '5-2a';
         }
         try {
