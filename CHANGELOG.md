@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.4 - 2024-09-16
+- Added code to continue import if duplicate records are found in archive table
+
 ### 5.0.3
 - Added plugin category for Marketplace
 
