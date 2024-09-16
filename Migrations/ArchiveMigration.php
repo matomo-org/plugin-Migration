@@ -53,7 +53,19 @@ class ArchiveMigration extends BaseMigration
                     if (!empty($archive['idarchive'])) {
                         $archive['idarchive'] = $this->createArchiveId($targetDb, $archiveTable, $archive['idarchive']);
                         $archive['idsite']    = $request->targetIdSite;
-                        $targetDb->insert($archiveTable, $archive);
+                        try {
+                            $targetDb->insert($archiveTable, $archive);
+                        } catch (\Exception $e) {
+                            if (
+                                $e->getCode() == 23000
+                                || strpos($e->getMessage(), 'Duplicate entry') !== false
+                                || strpos($e->getMessage(), ' 1062 ') !== false
+                            ) {
+                                $this->log('Duplicate entry in ' . $archiveTable . ' table for archiveID:' . $archive['idarchive'] . ' and name:' . $archive['name']);
+                                continue;
+                            }
+                            throw new \Exception($e->getMessage());
+                        }
                     }
                 }
             }
