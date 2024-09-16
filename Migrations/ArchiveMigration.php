@@ -61,7 +61,7 @@ class ArchiveMigration extends BaseMigration
                                 || strpos($e->getMessage(), 'Duplicate entry') !== false
                                 || strpos($e->getMessage(), ' 1062 ') !== false
                             ) {
-                                $this->log('Duplicate entry in ' . $archiveTable . ' table for archiveID:' . $archive['idarchive'] . ' and name:' . $archive['name']);
+                                $this->log('Duplicate entry in ' . $archiveTable . ' table for archiveID: ' . $archive['idarchive'] . ' and name: ' . $archive['name']);
                                 continue;
                             }
                             throw new \Exception($e->getMessage());
