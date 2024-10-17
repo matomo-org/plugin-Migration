@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -29,8 +30,10 @@ class Provider
         ];
 
         $pluginManager = Plugin\Manager::getInstance();
-        if ($pluginManager->isPluginActivated('CustomDimensions')
-            && $pluginManager->isPluginLoaded('CustomDimensions')) {
+        if (
+            $pluginManager->isPluginActivated('CustomDimensions')
+            && $pluginManager->isPluginLoaded('CustomDimensions')
+        ) {
             $migrations[] = new CustomDimensionMigration();
         }
 

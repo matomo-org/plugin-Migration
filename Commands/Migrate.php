@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -132,6 +133,6 @@ class Migrate extends ConsoleCommand
 
     private function confirmMigration($idSite): bool
     {
-        return $this->askForConfirmation('<question>Are you sure you want to migrate the data for idSite '.(int) $idSite.'. (y/N)</question>');
+        return $this->askForConfirmation('<question>Are you sure you want to migrate the data for idSite ' . (int) $idSite . '. (y/N)</question>');
     }
 }

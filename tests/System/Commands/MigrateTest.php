@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -10,7 +11,6 @@ namespace Piwik\Plugins\Migration\tests\System\Commands;
 
 use Piwik\Access;
 use Piwik\Db;
-use Piwik\Piwik;
 use Piwik\Plugins\Migration\tests\Fixtures\MigrationFixture;
 use Piwik\Config;
 use Piwik\Tests\Framework\Mock\FakeAccess;
@@ -291,7 +291,6 @@ The following columns are missing in the target DB table "targetdb_log_action": 
     {
         return dirname(__FILE__) . '/..';
     }
-
 }
 
 MigrateTest::$fixture = new MigrationFixture();

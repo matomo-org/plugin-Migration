@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -31,7 +32,7 @@ class MigrationFixture extends Fixture
     public $dateTime = '2013-01-23 01:23:45';
     public $idSite = 1;
 
-    const TARGET_DB_PREFIX = 'targetdb_';
+    public const TARGET_DB_PREFIX = 'targetdb_';
 
     private $goals = array(
         array('name' => 'Download Software',  'match' => 'url', 'pattern' => 'download',   'patternType' => 'contains', 'revenue' => 0.10),
@@ -64,7 +65,7 @@ class MigrationFixture extends Fixture
         $this->trackSecondVisit();
 
         // make sure to archive data
-        Request::processRequest('API.get',array(
+        Request::processRequest('API.get', array(
             'period' => 'year',
             'date' => '2013-01-23',
             'idSite' => $this->idSite
@@ -74,9 +75,9 @@ class MigrationFixture extends Fixture
     private function setUpCustomDimensions()
     {
         $configuration = new Configuration();
-        $configuration->configureNewDimension($this->idSite,  'MyName1', CustomDimensions::SCOPE_VISIT, 1, $active = true, $extractions = array(), $caseSensitive = true);
-        $configuration->configureNewDimension($this->idSite,  'MyName2', CustomDimensions::SCOPE_ACTION, 1, $active = true, $extractions = array(), $caseSensitive = true);
-        $configuration->configureNewDimension($this->idSite,  'MyName3', CustomDimensions::SCOPE_ACTION, 2, $active = false, $extractions = array(), $caseSensitive = true);
+        $configuration->configureNewDimension($this->idSite, 'MyName1', CustomDimensions::SCOPE_VISIT, 1, $active = true, $extractions = array(), $caseSensitive = true);
+        $configuration->configureNewDimension($this->idSite, 'MyName2', CustomDimensions::SCOPE_ACTION, 1, $active = true, $extractions = array(), $caseSensitive = true);
+        $configuration->configureNewDimension($this->idSite, 'MyName3', CustomDimensions::SCOPE_ACTION, 2, $active = false, $extractions = array(), $caseSensitive = true);
     }
 
     private function setUpSegments()
@@ -109,7 +110,7 @@ class MigrationFixture extends Fixture
 
             $row = Db::fetchRow('SHOW CREATE TABLE `' . $table . '`');
             $sql = $row['Create Table'];
-            $sql = str_replace('`'.$table.'`', '`'.$tablePrefixed.'`', $sql);
+            $sql = str_replace('`' . $table . '`', '`' . $tablePrefixed . '`', $sql);
             $targetDb->getDb()->query($sql);
         }
     }

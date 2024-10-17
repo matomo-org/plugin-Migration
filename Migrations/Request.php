@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -19,5 +20,4 @@ class Request
      * @var int
      */
     public $targetIdSite;
-
 }
