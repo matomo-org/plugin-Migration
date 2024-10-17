@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -76,5 +77,4 @@ class LogActionMigrationTest extends IntegrationTestCase
         $targetId3 = $this->migration->migrateAction($id3, $this->targetDb);
         $this->assertEquals(3, $targetId3);
     }
-
 }

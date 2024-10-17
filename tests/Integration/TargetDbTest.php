@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -136,5 +137,4 @@ class TargetDbTest extends IntegrationTestCase
             array ('idsite' => '4', 'url' => 'https://www.foobaz.com'),
         ), $urls);
     }
-
 }

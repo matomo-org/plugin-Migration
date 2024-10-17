@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -41,7 +42,7 @@ class LogMigration extends BaseMigration
 
         $loggedAt = array(0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9);
 
-        foreach ($batchQuery->generateQuery('SELECT * FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ? ORDER BY idvisit ASC',  array($request->sourceIdSite)) as $visitRows) {
+        foreach ($batchQuery->generateQuery('SELECT * FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ? ORDER BY idvisit ASC', array($request->sourceIdSite)) as $visitRows) {
             $count += count($visitRows);
             $this->migrateVisits($visitRows, $request, $logActionMigration, $targetDb);
 
@@ -74,7 +75,7 @@ class LogMigration extends BaseMigration
         $visitorIds = implode(',', $visitorIds);
 
         $batchQuery = new BatchQuery();
-        foreach ($batchQuery->generateQuery('SELECT * FROM ' . Common::prefixTable('log_link_visit_action') . ' WHERE idvisit in ('.$visitorIds.') ORDER BY idlink_va ASC') as $actionRows) {
+        foreach ($batchQuery->generateQuery('SELECT * FROM ' . Common::prefixTable('log_link_visit_action') . ' WHERE idvisit in (' . $visitorIds . ') ORDER BY idlink_va ASC') as $actionRows) {
             foreach ($actionRows as $row) {
                 $oldIdLinkAction = $row['idlink_va'];
                 $row['idvisit'] = $visitorIdMap[$row['idvisit']];
@@ -91,7 +92,7 @@ class LogMigration extends BaseMigration
         }
         unset($actionRows);
 
-        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('log_conversion') . ' WHERE idvisit in ('.$visitorIds.')');
+        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('log_conversion') . ' WHERE idvisit in (' . $visitorIds . ')');
         foreach ($rows as $row) {
             $row['idvisit'] = $visitorIdMap[$row['idvisit']];
             if (isset($row['idlink_va'])) {
@@ -106,7 +107,7 @@ class LogMigration extends BaseMigration
 
         unset($rows);
 
-        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('log_conversion_item') . ' WHERE idvisit in ('.$visitorIds.')');
+        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('log_conversion_item') . ' WHERE idvisit in (' . $visitorIds . ')');
         foreach ($rows as $row) {
             $row['idvisit'] = $visitorIdMap[$row['idvisit']];
             $row['idsite'] = $request->targetIdSite;
@@ -136,5 +137,4 @@ class LogMigration extends BaseMigration
 
         unset($visitRows);
     }
-
 }

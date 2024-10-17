@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -9,7 +10,6 @@
 namespace Piwik\Plugins\Migration\Migrations;
 
 use Piwik\Common;
-use Piwik\Config;
 use Piwik\DataAccess\ArchiveTableCreator;
 use Piwik\Plugins\Migration\Db\BatchQuery;
 use Piwik\Plugins\Migration\TargetDb;

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -33,7 +34,7 @@ abstract class BaseMigration
 
     protected function migrateEntities(Request $request, TargetDb $targetDb, $tableUnprefixed, $entityName, $unsetId = null, $idSiteColumnName = 'idsite')
     {
-        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable($tableUnprefixed) . ' WHERE '.$idSiteColumnName.' = ?', array($request->sourceIdSite));
+        $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable($tableUnprefixed) . ' WHERE ' . $idSiteColumnName . ' = ?', array($request->sourceIdSite));
 
         $this->log(sprintf('Found %s %s', count($rows), $entityName));
 
