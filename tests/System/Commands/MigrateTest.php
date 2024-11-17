@@ -150,6 +150,8 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
         if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
             $params['testSuffix'] = '5-2a';
+        } elseif ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
+            $params['testSuffix'] = '5-2b6';
         }
 
         $this->runApiTests($api, $params);
@@ -169,6 +171,8 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
         if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
             $params['testSuffix'] = '5-2a';
+        } elseif ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
+            $params['testSuffix'] = '5-2b6';
         }
         try {
             $this->runApiTests($api, $params);
