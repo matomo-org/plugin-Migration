@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.5 - 2025-01-20
+- Added missing license file
+
 ### 5.0.4 - 2024-09-16
 - Added code to continue import if duplicate records are found in archive table
 
