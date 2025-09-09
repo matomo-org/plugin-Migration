@@ -15,13 +15,32 @@ use Piwik\Plugins\Migration\TargetDb;
 
 class AnnotationsMigration extends BaseMigration
 {
+    /**
+     * @param TargetDb $targetDb
+     * @return array
+     */
     public function validateStructure(TargetDb $targetDb)
     {
-        return array();
+        // since Matomo 5.5.0, annotations are stored in their own table
+        // and the AnnotationList class had been removed
+        if (!class_exists(AnnotationList::class)) {
+            return $this->checkTablesHaveSameStructure($targetDb, 'annotations');
+        }
+
+        return [];
     }
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
+        // since Matomo 5.5.0, annotations are stored in their own table
+        // and the AnnotationList class had been removed
+        if (!class_exists(AnnotationList::class)) {
+            $this->migrateEntities($request, $targetDb, 'annotations', 'annotations', 'id');
+
+            return;
+        }
+
+        // before Matomo 5.5.0, annotations were stored in the options table
         $sourceName = AnnotationList::getAnnotationCollectionOptionName($request->sourceIdSite);
         $targetName = AnnotationList::getAnnotationCollectionOptionName($request->targetIdSite);
 
