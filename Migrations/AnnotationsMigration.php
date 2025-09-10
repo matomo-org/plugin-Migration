@@ -9,6 +9,7 @@
 
 namespace Piwik\Plugins\Migration\Migrations;
 
+use Piwik\Common;
 use Piwik\Option;
 use Piwik\Plugins\Annotations\AnnotationList;
 use Piwik\Plugins\Migration\TargetDb;
@@ -30,6 +31,11 @@ class AnnotationsMigration extends BaseMigration
         return [];
     }
 
+    /**
+     * @param Request $request
+     * @param TargetDb $targetDb
+     * @return void
+     */
     public function migrate(Request $request, TargetDb $targetDb)
     {
         // since Matomo 5.5.0, annotations are stored in their own table
@@ -46,7 +52,8 @@ class AnnotationsMigration extends BaseMigration
 
         $annotations = Option::get($sourceName);
         if ($annotations) {
-            $this->log('Found annotations');
+            $annotationItems = Common::safe_unserialize($annotations) ?: [];
+            $this->log(sprintf('Found %d annotations', count($annotationItems)));
 
             $targetDb->insert('option', array(
                 'option_name' => $targetName,

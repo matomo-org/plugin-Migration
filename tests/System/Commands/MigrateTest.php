@@ -56,7 +56,7 @@ Processing SegmentsMigration at 2019-01-10 02:48:01
 Found 2 segments at 2019-01-10 02:48:01
 Processed SegmentsMigration at 2019-01-10 02:48:01
 Processing AnnotationsMigration at 2019-01-10 02:48:01
-Found annotations at 2019-01-10 02:48:01
+Found 1 annotations at 2019-01-10 02:48:01
 Processed AnnotationsMigration at 2019-01-10 02:48:01
 Processing CustomDimensionMigration at 2019-01-10 02:48:01
 Found 3 custom dimensions at 2019-01-10 02:48:01
