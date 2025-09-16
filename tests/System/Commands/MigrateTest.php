@@ -56,7 +56,7 @@ Processing SegmentsMigration at 2019-01-10 02:48:01
 Found 2 segments at 2019-01-10 02:48:01
 Processed SegmentsMigration at 2019-01-10 02:48:01
 Processing AnnotationsMigration at 2019-01-10 02:48:01
-Found annotations at 2019-01-10 02:48:01
+Found 1 annotations at 2019-01-10 02:48:01
 Processed AnnotationsMigration at 2019-01-10 02:48:01
 Processing CustomDimensionMigration at 2019-01-10 02:48:01
 Found 3 custom dimensions at 2019-01-10 02:48:01
@@ -138,6 +138,14 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $archives = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('archive_blob_2013_01'));
         $this->assertGreaterThanOrEqual(195, count($archives));
         $this->assertLessThanOrEqual(600, count($archives));
+
+        if (!class_exists('Piwik\Plugins\Annotations\AnnotationList')) {
+            $annotationsTable = self::$fixture->targetDb->prefixTable('annotations');
+            $this->assertContains($annotationsTable, $targetDb->listTables(), 'annotations table does not exist');
+
+            $annotationItems = $targetDb->fetchAll('SELECT * FROM ' . $annotationsTable);
+            $this->assertCount(1, $annotationItems);
+        }
     }
 
     /**
