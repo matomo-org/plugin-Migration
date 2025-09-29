@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.6 - 2025-09-29
+- Allow annotations migration to work with both option and annotations tables
+
 ### 5.0.5 - 2025-01-20
 - Added missing license file
 
