@@ -63,11 +63,11 @@
 	<nb_visits_converted_returning_visit>0</nb_visits_converted_returning_visit>
 	<revenue_returning_visit>0</revenue_returning_visit>
 	<conversion_rate_returning_visit>0%</conversion_rate_returning_visit>
-	<BotTracking_AIAssistantsRequests>0</BotTracking_AIAssistantsRequests>
-	<BotTracking_AIAssistantsAcquiredVisits>0</BotTracking_AIAssistantsAcquiredVisits>
-	<BotTracking_AIAssistantsNotFoundRequests>0</BotTracking_AIAssistantsNotFoundRequests>
-	<BotTracking_AIAssistantsUniqueAssistants>0</BotTracking_AIAssistantsUniqueAssistants>
-	<BotTracking_AIAssistantsServerErrorRequests>0</BotTracking_AIAssistantsServerErrorRequests>
+	<BotTracking_AIChatbotsRequests>0</BotTracking_AIChatbotsRequests>
+	<BotTracking_AIChatbotsAcquiredVisits>0</BotTracking_AIChatbotsAcquiredVisits>
+	<BotTracking_AIChatbotsNotFoundRequests>0</BotTracking_AIChatbotsNotFoundRequests>
+	<BotTracking_AIChatbotsUniqueChatbots>0</BotTracking_AIChatbotsUniqueChatbots>
+	<BotTracking_AIChatbotsServerErrorRequests>0</BotTracking_AIChatbotsServerErrorRequests>
 	<nb_total_overall_bandwidth>0</nb_total_overall_bandwidth>
 	<nb_total_pageview_bandwidth>0</nb_total_pageview_bandwidth>
 	<nb_total_download_bandwidth>0</nb_total_download_bandwidth>
@@ -101,5 +101,5 @@
 	<bounce_rate>0%</bounce_rate>
 	<nb_actions_per_visit>2</nb_actions_per_visit>
 	<avg_time_on_site>633</avg_time_on_site>
-	<BotTracking_AIAssistantsClickThroughRate>0</BotTracking_AIAssistantsClickThroughRate>
+	<BotTracking_AIChatbotsClickThroughRate>0</BotTracking_AIChatbotsClickThroughRate>
 </result>
