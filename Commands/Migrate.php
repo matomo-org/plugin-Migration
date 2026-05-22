@@ -24,14 +24,14 @@ class Migrate extends ConsoleCommand
         $this->setName('migration:measurable');
         $this->setDescription('Migrates a measurable/website from one Matomo instance to another Matomo');
 
-//        $this->addRequiredValueOption('source-idsite', null, 'Source Site ID you want to migrate');
-//        $this->addRequiredValueOption('target-db-host', null, 'Target database host');
-//        $this->addRequiredValueOption('target-db-username', null, 'Target database username');
-//        $this->addOptionalValueOption('target-db-password', null, 'Target database password');
-//        $this->addRequiredValueOption('target-db-name', null, 'Target database name');
-//        $this->addOptionalValueOption('target-db-prefix', null, 'Target database table prefix', '');
-//        $this->addRequiredValueOption('target-db-port', null, 'Target database port', '3306');
-//        $this->addOptionalValueOption('target-db-ssl-ca', null, 'The path name to the certificate authority file.', '/etc/ssl/certs/cert.pem');
+        $this->addRequiredValueOption('source-idsite', null, 'Source Site ID you want to migrate');
+        $this->addRequiredValueOption('target-db-host', null, 'Target database host');
+        $this->addRequiredValueOption('target-db-username', null, 'Target database username');
+        $this->addOptionalValueOption('target-db-password', null, 'Target database password');
+        $this->addRequiredValueOption('target-db-name', null, 'Target database name');
+        $this->addOptionalValueOption('target-db-prefix', null, 'Target database table prefix', '');
+        $this->addRequiredValueOption('target-db-port', null, 'Target database port', '3306');
+        $this->addOptionalValueOption('target-db-ssl-ca', null, 'The path name to the certificate authority file.', '/etc/ssl/certs/cert.pem');
         $this->addNoValueOption('target-db-enable-ssl', null, 'Used for establishing secure connections using SSL with target database host.');
         $this->addNoValueOption('target-db-ssl-no-verify', null, 'Disable server certificate validation of the target database host.');
         $this->addNoValueOption('skip-logs', null, 'Skip migration of logs');
