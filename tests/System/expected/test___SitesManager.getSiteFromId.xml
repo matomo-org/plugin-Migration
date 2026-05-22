@@ -3,6 +3,7 @@
 	<row>
 		<idsite>1</idsite>
 		<name>MigrationSite</name>
+		<description/>
 		<main_url>http://piwik.net</main_url>
 		<ts_created>2013-01-22 00:00:00</ts_created>
 		<ecommerce>1</ecommerce>

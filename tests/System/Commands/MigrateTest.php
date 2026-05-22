@@ -73,35 +73,11 @@ Migrated 90% of visits at 2019-01-10 02:48:01
 Migrated 2 visits. The number of migrated visits may be higher if data is still tracked into the source Matomo while migrating the data at 2019-01-10 02:48:01
 Processed LogMigration at 2019-01-10 02:48:01
 Processing ArchiveMigration at 2019-01-10 02:48:01
-Found 14 archive tables at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
+Found 2 archive tables at 2019-01-10 02:48:01
 Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
 Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
 Processed ArchiveMigration at 2019-01-10 02:48:01
 ', $this->applicationTester->getDisplay());
         $this->assertEquals('0', $result);
@@ -221,9 +197,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
     {
         $result = $this->runCommand();
         $this->assertStringContainsString('Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01', $this->applicationTester->getDisplay());
+Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01', $this->applicationTester->getDisplay());
         $this->assertEquals('0', $result);
         $result = $this->runCommand();
         $this->assertEquals('0', $result);
