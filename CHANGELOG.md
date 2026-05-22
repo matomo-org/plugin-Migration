@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.6 - 2026-05-25
+- Added code to ignore migration if no option is provided explicitly
+
 ### 5.0.6 - 2025-09-29
 - Allow annotations migration to work with both option and annotations tables
 
