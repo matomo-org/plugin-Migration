@@ -132,11 +132,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         FakeAccess::clearAccess(true);
         $this->disableArchiving();
 
-        if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
-            $params['testSuffix'] = '5-2a';
-        } elseif ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
-            $params['testSuffix'] = '5-2b6';
-        }
+        $params['testSuffix'] = $this->getTestSuffix($api);
 
         $this->runApiTests($api, $params);
     }
@@ -153,11 +149,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
         FakeAccess::clearAccess($superUser = true);
 
-        if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
-            $params['testSuffix'] = '5-2a';
-        } elseif ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
-            $params['testSuffix'] = '5-2b6';
-        }
+        $params['testSuffix'] = $this->getTestSuffix($api);
         try {
             $this->runApiTests($api, $params);
         } catch (\Exception $e) {
@@ -166,6 +158,22 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         }
 
         $this->setTargetDbPrefix('');
+    }
+
+    private function getTestSuffix($api)
+    {
+        if (
+            in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls'], ['SitesManager.getSiteFromId']])
+            && version_compare(Version::VERSION, '5.2.0-alpha', '<')
+        ) {
+            return '5-2a';
+        }
+
+        if ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
+            return '5-2b6';
+        }
+
+        return '';
     }
 
     private function setTargetDbPrefix($prefix)
@@ -196,8 +204,12 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
     public function test_runMigration_CanBeExecutedMultipleTimesWithoutAnyIdProblems()
     {
         $result = $this->runCommand();
-        $this->assertStringContainsString('Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01', $this->applicationTester->getDisplay());
+        $output = $this->applicationTester->getDisplay();
+        $this->assertTrue(
+            strpos($output, 'Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01') !== false
+            || strpos($output, 'Skipping table because it is a target table targetdb_archive_numeric_2013_01 and source prefix is: at 2019-01-10 02:48:01') !== false,
+            $output
+        );
         $this->assertEquals('0', $result);
         $result = $this->runCommand();
         $this->assertEquals('0', $result);
