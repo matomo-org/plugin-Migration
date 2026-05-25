@@ -40,7 +40,7 @@ class MigrateTest extends ConsoleCommandTestCase
     public function test_runMigration()
     {
         $result = $this->runCommand();
-        $this->assertEquals('Processing SiteMigration at 2019-01-10 02:48:01
+        $expectedOutput = 'Processing SiteMigration at 2019-01-10 02:48:01
 Target site is 1 at 2019-01-10 02:48:01
 Processed SiteMigration at 2019-01-10 02:48:01
 Processing SiteUrlMigration at 2019-01-10 02:48:01
@@ -72,38 +72,8 @@ Migrated 80% of visits at 2019-01-10 02:48:01
 Migrated 90% of visits at 2019-01-10 02:48:01
 Migrated 2 visits. The number of migrated visits may be higher if data is still tracked into the source Matomo while migrating the data at 2019-01-10 02:48:01
 Processed LogMigration at 2019-01-10 02:48:01
-Processing ArchiveMigration at 2019-01-10 02:48:01
-Found 14 archive tables at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
-Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
-Processed ArchiveMigration at 2019-01-10 02:48:01
-', $this->applicationTester->getDisplay());
+' . $this->getExpectedArchiveMigrationOutput();
+        $this->assertEquals($expectedOutput, $this->applicationTester->getDisplay());
         $this->assertEquals('0', $result);
     }
 
@@ -156,11 +126,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         FakeAccess::clearAccess(true);
         $this->disableArchiving();
 
-        if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
-            $params['testSuffix'] = '5-2a';
-        } elseif ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
-            $params['testSuffix'] = '5-2b6';
-        }
+        $params['testSuffix'] = $this->getTestSuffix($api);
 
         $this->runApiTests($api, $params);
     }
@@ -177,11 +143,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
         FakeAccess::clearAccess($superUser = true);
 
-        if (in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']]) && version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
-            $params['testSuffix'] = '5-2a';
-        } elseif ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
-            $params['testSuffix'] = '5-2b6';
-        }
+        $params['testSuffix'] = $this->getTestSuffix($api);
         try {
             $this->runApiTests($api, $params);
         } catch (\Exception $e) {
@@ -190,6 +152,69 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         }
 
         $this->setTargetDbPrefix('');
+    }
+
+    private function getTestSuffix($api)
+    {
+        if (
+            in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls'], ['SitesManager.getSiteFromId'], ['CustomDimensions.getConfiguredCustomDimensions']])
+            && version_compare(Version::VERSION, '5.2.0-alpha', '<')
+        ) {
+            return '5-2a';
+        }
+
+        if ($api === ['API.get'] && version_compare(Version::VERSION, '5.2.0-b6', '<')) {
+            return '5-2b6';
+        }
+
+        return '';
+    }
+
+    private function getExpectedArchiveMigrationOutput()
+    {
+        if (version_compare(Version::VERSION, '5.2.0-alpha', '<')) {
+            return 'Processing ArchiveMigration at 2019-01-10 02:48:01
+Found 14 archive tables at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_03 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_04 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_05 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_06 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_07 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_08 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_09 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_10 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_11 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_12 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2014_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Processed ArchiveMigration at 2019-01-10 02:48:01
+';
+        }
+
+        return 'Processing ArchiveMigration at 2019-01-10 02:48:01
+Found 2 archive tables at 2019-01-10 02:48:01
+Starting to migrate archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Migrated archive table archive_blob_2013_01 at 2019-01-10 02:48:01
+Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
+Processed ArchiveMigration at 2019-01-10 02:48:01
+';
     }
 
     private function setTargetDbPrefix($prefix)
@@ -220,10 +245,12 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
     public function test_runMigration_CanBeExecutedMultipleTimesWithoutAnyIdProblems()
     {
         $result = $this->runCommand();
-        $this->assertStringContainsString('Starting to migrate archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01
-Starting to migrate archive table archive_numeric_2013_02 at 2019-01-10 02:48:01
-Migrated archive table archive_numeric_2013_02 at 2019-01-10 02:48:01', $this->applicationTester->getDisplay());
+        $output = $this->applicationTester->getDisplay();
+        $this->assertTrue(
+            strpos($output, 'Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01') !== false
+            || strpos($output, 'Skipping table because it is a target table targetdb_archive_numeric_2013_01 and source prefix is: at 2019-01-10 02:48:01') !== false,
+            $output
+        );
         $this->assertEquals('0', $result);
         $result = $this->runCommand();
         $this->assertEquals('0', $result);
