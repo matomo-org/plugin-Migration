@@ -1,6 +1,6 @@
 ## Changelog
 
-### 5.0.6 - 2026-05-25
+### 5.0.7 - 2026-06-08
 - Added code to ignore migration if no option is provided explicitly
 
 ### 5.0.6 - 2025-09-29
