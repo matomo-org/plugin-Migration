@@ -45,7 +45,7 @@
 		<avg_time_on_page>180</avg_time_on_page>
 		<bounce_rate>0%</bounce_rate>
 		<exit_rate>50%</exit_rate>
-		<segment>pageUrl=^http%253A%252F%252Fpiwik.net%252Fsub</segment>
+		<segment>pageUrl=^http%253A%252F%252Fpiwik.net%252Fsub,pageUrl=^https%253A%252F%252Fwww.example1.com%252Fsub,pageUrl=^https%253A%252F%252Fwww.example2.net%252Fsub</segment>
 		<subtable>
 			<row>
 				<label>/page</label>

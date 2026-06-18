@@ -167,6 +167,12 @@ Processed LogMigration at 2019-01-10 02:48:01
             return '5-2b6';
         }
 
+        // The folder-level pageUrl segment only included URL aliases as of 5.12.0-alpha
+        // (matomo-org/matomo#24598). Older core still produces a single-clause segment.
+        if ($api === ['Actions.getPageUrls'] && version_compare(Version::VERSION, '5.12.0-alpha', '<')) {
+            return '5-12a';
+        }
+
         return '';
     }
 
