@@ -46,4 +46,9 @@ class BatchQuery
     {
         return $sql . ' LIMIT ' . (int)$this->limit . ' OFFSET ' . (int) $offset;
     }
+
+    public function getLimit(): int
+    {
+        return $this->limit;
+    }
 }

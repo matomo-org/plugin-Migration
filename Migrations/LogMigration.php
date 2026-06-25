@@ -37,14 +37,22 @@ class LogMigration extends BaseMigration
 
         $logActionMigration = new LogActionMigration();
 
-        $batchQuery = new BatchQuery();
         $count = 0;
-
         $loggedAt = array(0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9);
 
-        foreach ($batchQuery->generateQuery('SELECT * FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ? ORDER BY idvisit ASC', array($request->sourceIdSite)) as $visitRows) {
+        $table = Common::prefixTable('log_visit');
+
+        $batchQuery = new BatchQuery();
+        $limit = $batchQuery->getLimit();
+
+        $sql = 'SELECT * FROM %s WHERE idsite = ? AND idvisit > ? ORDER BY idvisit ASC LIMIT %d';
+        $sql = sprintf($sql, $table, $limit);
+
+        $lastIdVisit = 0;
+        while ($visitRows = Db::fetchAll($sql, [$request->sourceIdSite, $lastIdVisit])) {
             $count += count($visitRows);
             $this->migrateVisits($visitRows, $request, $logActionMigration, $targetDb);
+            $lastIdVisit = end($visitRows)['idvisit'];
 
             foreach ($loggedAt as $logAt) {
                 if ($numVisits && ($count / $numVisits) > $logAt) {
