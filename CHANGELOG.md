@@ -1,5 +1,8 @@
 ## Changelog
 
+### 5.0.8 - 2026-06-29
+- Improved visit log migration batching to use idvisit keyset pagination
+
 ### 5.0.7 - 2026-06-08
 - Added code to ignore migration if no option is provided explicitly
 
