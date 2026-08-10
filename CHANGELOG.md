@@ -1,5 +1,8 @@
 ## Changelog
 
+### 6.0.0 - 2026-08-10
+- Compatibility with Matomo 6
+
 ### 5.0.8 - 2026-06-29
 - Improved visit log migration batching to use idvisit keyset pagination
 
