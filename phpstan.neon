@@ -6,8 +6,10 @@ parameters:
         - .
     excludePaths:
         - tests/*
-        - vendor/
-        - github-action-tests/
+        # Optional: neither exists under the shared workflow, which checks helpers out to a
+        # run-scoped path outside the plugin. PHPStan hard-errors on an excludePath that is missing.
+        - vendor/ (?)
+        - github-action-tests/ (?)
     bootstrapFiles:
         - ../../bootstrap-phpstan.php
     universalObjectCratesClasses:
