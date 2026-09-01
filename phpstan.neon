@@ -1,0 +1,20 @@
+parameters:
+    level: 5
+    phpVersion: 80100
+    tmpDir: /tmp/phpstan/Migration/main
+    paths:
+        - .
+    excludePaths:
+        - tests/*
+        # Optional: neither exists under the shared workflow, which checks helpers out to a
+        # run-scoped path outside the plugin. PHPStan hard-errors on an excludePath that is missing.
+        - vendor/ (?)
+        - github-action-tests/ (?)
+    bootstrapFiles:
+        - ../../bootstrap-phpstan.php
+    universalObjectCratesClasses:
+        - Piwik\Config
+        - Piwik\View
+        - Piwik\ViewDataTable\Config
+    scanDirectories:
+        - ../../

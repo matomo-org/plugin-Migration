@@ -99,6 +99,7 @@ class Migrate extends ConsoleCommand
 
     public function logMessage($message)
     {
+        // @phpstan-ignore booleanAnd.rightAlwaysTrue (in production PIWIK_TEST_MODE is undefined and defined() short-circuits)
         if (defined('PIWIK_TEST_MODE') && PIWIK_TEST_MODE) {
             $now = '2019-01-10 02:48:01';
         } else {
