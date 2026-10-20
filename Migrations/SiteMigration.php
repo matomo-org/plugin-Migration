@@ -15,8 +15,6 @@ use Piwik\Plugins\Migration\TargetDb;
 
 class SiteMigration extends BaseMigration
 {
-    private $targetIdSite;
-
     public function validateStructure(TargetDb $targetDb)
     {
         return $this->checkTablesHaveSameStructure($targetDb, 'site');

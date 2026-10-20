@@ -1,0 +1,29 @@
+parameters:
+    level: 5
+    phpVersion: 70200
+    tmpDir: /tmp/phpstan/Migration/main
+    paths:
+        - .
+    excludePaths:
+        - tests/*
+        # Optional: neither exists under the shared workflow, which checks helpers out to a
+        # run-scoped path outside the plugin. PHPStan hard-errors on an excludePath that is missing.
+        - vendor/ (?)
+        - github-action-tests/ (?)
+    ignoreErrors:
+        # PIWIK_TEST_MODE only reads as always true because the scanned core test bootstrap defines
+        # it; in production it is undefined and defined() short-circuits. Matomo 5.0 doesn't define
+        # it where PHPStan sees it, so the minimum leg reports nothing to match.
+        -
+            identifier: booleanAnd.rightAlwaysTrue
+            path: Commands/Migrate.php
+            count: 1
+            reportUnmatched: false
+    bootstrapFiles:
+        - ../../bootstrap-phpstan.php
+    universalObjectCratesClasses:
+        - Piwik\Config
+        - Piwik\View
+        - Piwik\ViewDataTable\Config
+    scanDirectories:
+        - ../../
