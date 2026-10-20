@@ -18,7 +18,7 @@ use Exception;
 class TargetDb
 {
     /**
-     * @var \Zend_Db_Adapter_Abstract
+     * @var \Zend_Db_Adapter_Abstract&\Piwik\Db\AdapterInterface
      */
     private $db;
 
@@ -37,7 +37,6 @@ class TargetDb
             $this->config[$key] = $val;
         }
         $this->db = $this->testConnection($this->config);
-        return $this->db;
     }
 
     public function disableTransactions()
@@ -226,7 +225,7 @@ class TargetDb
 
     /**
      * @param array $config
-     * @return Db\AdapterInterface
+     * @return \Zend_Db_Adapter_Abstract&Db\AdapterInterface
      */
     private function testConnection($config)
     {
@@ -235,6 +234,7 @@ class TargetDb
             if ($adapter === 'WordPress') {
                 $adapter = 'Mysqli';
             }
+            /** @var \Zend_Db_Adapter_Abstract&Db\AdapterInterface $db every adapter the factory creates extends the Zend adapter */
             $db = @Db\Adapter::factory($adapter, $config);
         } catch (Exception $e) {
             throw new Exception('Cannot connect to the target database: ' . $e->getMessage(), $e->getCode(), $e);

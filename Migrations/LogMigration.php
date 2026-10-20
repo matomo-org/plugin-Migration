@@ -28,7 +28,7 @@ class LogMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
-        $numVisits = Db::fetchOne('SELECT count(*) FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ?', array($request->sourceIdSite));
+        $numVisits = (int) Db::fetchOne('SELECT count(*) FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ?', array($request->sourceIdSite));
         $this->log(sprintf('Found %s visits', $numVisits));
 
         if (!$numVisits) {
@@ -55,7 +55,7 @@ class LogMigration extends BaseMigration
             $lastIdVisit = end($visitRows)['idvisit'];
 
             foreach ($loggedAt as $logAt) {
-                if ($numVisits && ($count / $numVisits) > $logAt) {
+                if (($count / $numVisits) > $logAt) {
                     $this->log('Migrated ' . ($logAt * 100) . '% of visits');
                     array_shift($loggedAt);
                 }
