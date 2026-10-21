@@ -101,6 +101,9 @@ Processed LogMigration at 2019-01-10 02:48:01
         $conversionItems = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('log_conversion_item'));
         $this->assertCount(2, $conversionItems);
 
+        $pageViewTimes = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('log_page_view_time'));
+        $this->assertCount(4, $pageViewTimes);
+
         $archives = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('archive_numeric_2013_01'));
         $this->assertGreaterThanOrEqual(195, count($archives));
         $this->assertLessThanOrEqual(600, count($archives));
@@ -296,8 +299,8 @@ The following columns are missing in the target DB table "targetdb_log_action": 
                     'date' => self::$fixture->dateTime,
                     'periods' => ['day', 'year'],
                     'testSuffix' => $testSuffix,
-                    'xmlFieldsToRemove' => ['pageIdAction']
-                ]
+                    'xmlFieldsToRemove' => ['pageIdAction'],
+                ],
             ];
         }
 
@@ -323,7 +326,7 @@ The following columns are missing in the target DB table "targetdb_log_action": 
     public static function provideContainerConfigBeforeClass()
     {
         return [
-            Access::class => new FakeAccess()
+            Access::class => new FakeAccess(),
         ];
     }
 

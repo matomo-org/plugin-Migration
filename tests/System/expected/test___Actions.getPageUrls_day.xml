@@ -4,7 +4,7 @@
 		<label>sub</label>
 		<nb_visits>2</nb_visits>
 		<nb_hits>2</nb_hits>
-		<sum_time_spent>360</sum_time_spent>
+		<sum_time_spent>540</sum_time_spent>
 		<sum_bandwidth>0</sum_bandwidth>
 		<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
 		<min_bandwidth />
@@ -48,7 +48,7 @@
 		<entry_nb_visits_percent_of_total>50%</entry_nb_visits_percent_of_total>
 		<entry_nb_actions_percent_of_total>50%</entry_nb_actions_percent_of_total>
 		<exit_nb_visits_percent_of_total>100%</exit_nb_visits_percent_of_total>
-		<avg_time_on_page>180</avg_time_on_page>
+		<avg_time_on_page>270</avg_time_on_page>
 		<bounce_rate>0%</bounce_rate>
 		<exit_rate>50%</exit_rate>
 		<segment>pageUrl=^http%253A%252F%252Fpiwik.net%252Fsub,pageUrl=^https%253A%252F%252Fwww.example1.com%252Fsub,pageUrl=^https%253A%252F%252Fwww.example2.net%252Fsub</segment>
@@ -58,7 +58,7 @@
 				<nb_visits>2</nb_visits>
 				<nb_uniq_visitors>2</nb_uniq_visitors>
 				<nb_hits>2</nb_hits>
-				<sum_time_spent>360</sum_time_spent>
+				<sum_time_spent>540</sum_time_spent>
 				<sum_bandwidth>0</sum_bandwidth>
 				<nb_hits_with_bandwidth>0</nb_hits_with_bandwidth>
 				<min_bandwidth />
@@ -102,7 +102,7 @@
 				<entry_nb_visits_percent_of_total>50%</entry_nb_visits_percent_of_total>
 				<entry_nb_actions_percent_of_total>50%</entry_nb_actions_percent_of_total>
 				<exit_nb_visits_percent_of_total>100%</exit_nb_visits_percent_of_total>
-				<avg_time_on_page>180</avg_time_on_page>
+				<avg_time_on_page>270</avg_time_on_page>
 				<bounce_rate>0%</bounce_rate>
 				<exit_rate>50%</exit_rate>
 				<url>http://example.com/sub/page</url>
