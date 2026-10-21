@@ -263,6 +263,13 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
     public function test_runMigration_CanBeExecutedMultipleTimesWithoutAnyIdProblems()
     {
+        $hasPageViewTimes = version_compare(Version::VERSION, '6.0.0-b6', '>=');
+        $targetDb = self::$fixture->targetDb;
+        $pageViewTimeTable = $targetDb->prefixTable('log_page_view_time');
+        if ($hasPageViewTimes) {
+            $pageViewTimesBefore = (int) $targetDb->getDb()->fetchOne("SELECT COUNT(*) FROM $pageViewTimeTable");
+        }
+
         $result = $this->runCommand();
         $output = $this->applicationTester->getDisplay();
         $this->assertTrue(
@@ -273,6 +280,17 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $this->assertEquals('0', $result);
         $result = $this->runCommand();
         $this->assertEquals('0', $result);
+
+        // Source and target ids only differ once the target already holds migrated rows, so a missing remap can only show here
+        if ($hasPageViewTimes) {
+            $this->assertEquals($pageViewTimesBefore + 8, $targetDb->getDb()->fetchOne("SELECT COUNT(*) FROM $pageViewTimeTable"));
+            $this->assertEquals(0, $targetDb->getDb()->fetchOne(
+                "SELECT COUNT(*) FROM $pageViewTimeTable pvt
+                 LEFT JOIN " . $targetDb->prefixTable('log_link_visit_action') . " lva
+                     ON lva.idvisit = pvt.idvisit AND lva.idlink_va = pvt.idlink_va AND lva.idsite = pvt.idsite
+                 WHERE lva.idlink_va IS NULL"
+            ));
+        }
     }
 
     public function test_runMigration_failsWhenNotSameStructure()
