@@ -101,6 +101,11 @@ Processed LogMigration at 2019-01-10 02:48:01
         $conversionItems = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('log_conversion_item'));
         $this->assertCount(2, $conversionItems);
 
+        if (version_compare(Version::VERSION, '6.0.0-b6', '>=')) {
+            $pageViewTimes = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('log_page_view_time'));
+            $this->assertCount(4, $pageViewTimes);
+        }
+
         $archives = $targetDb->fetchAll('SELECT * FROM ' . self::$fixture->targetDb->prefixTable('archive_numeric_2013_01'));
         $this->assertGreaterThanOrEqual(195, count($archives));
         $this->assertLessThanOrEqual(600, count($archives));
@@ -171,6 +176,14 @@ Processed LogMigration at 2019-01-10 02:48:01
         // (matomo-org/matomo#24598). Older core still produces a single-clause segment.
         if ($api === ['Actions.getPageUrls'] && version_compare(Version::VERSION, '5.12.0-alpha', '<')) {
             return '5-12a';
+        }
+
+        // Time on page only comes from log_page_view_time as of 6.0.0-b6 (matomo-org/matomo#24788)
+        if (
+            in_array($api, [['Live.getLastVisitsDetails'], ['Actions.getPageUrls']])
+            && version_compare(Version::VERSION, '6.0.0-b6', '<')
+        ) {
+            return '6-0b6';
         }
 
         return '';
@@ -250,6 +263,13 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
 
     public function test_runMigration_CanBeExecutedMultipleTimesWithoutAnyIdProblems()
     {
+        $hasPageViewTimes = version_compare(Version::VERSION, '6.0.0-b6', '>=');
+        $targetDb = self::$fixture->targetDb;
+        $pageViewTimeTable = $targetDb->prefixTable('log_page_view_time');
+        if ($hasPageViewTimes) {
+            $pageViewTimesBefore = (int) $targetDb->getDb()->fetchOne("SELECT COUNT(*) FROM $pageViewTimeTable");
+        }
+
         $result = $this->runCommand();
         $output = $this->applicationTester->getDisplay();
         $this->assertTrue(
@@ -260,6 +280,17 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $this->assertEquals('0', $result);
         $result = $this->runCommand();
         $this->assertEquals('0', $result);
+
+        // Source and target ids only differ once the target already holds migrated rows, so a missing remap can only show here
+        if ($hasPageViewTimes) {
+            $this->assertEquals($pageViewTimesBefore + 8, $targetDb->getDb()->fetchOne("SELECT COUNT(*) FROM $pageViewTimeTable"));
+            $this->assertEquals(0, $targetDb->getDb()->fetchOne(
+                "SELECT COUNT(*) FROM $pageViewTimeTable pvt
+                 LEFT JOIN " . $targetDb->prefixTable('log_link_visit_action') . " lva
+                     ON lva.idvisit = pvt.idvisit AND lva.idlink_va = pvt.idlink_va AND lva.idsite = pvt.idsite
+                 WHERE lva.idlink_va IS NULL"
+            ));
+        }
     }
 
     public function test_runMigration_failsWhenNotSameStructure()
@@ -296,8 +327,8 @@ The following columns are missing in the target DB table "targetdb_log_action": 
                     'date' => self::$fixture->dateTime,
                     'periods' => ['day', 'year'],
                     'testSuffix' => $testSuffix,
-                    'xmlFieldsToRemove' => ['pageIdAction']
-                ]
+                    'xmlFieldsToRemove' => ['pageIdAction'],
+                ],
             ];
         }
 
@@ -323,7 +354,7 @@ The following columns are missing in the target DB table "targetdb_log_action": 
     public static function provideContainerConfigBeforeClass()
     {
         return [
-            Access::class => new FakeAccess()
+            Access::class => new FakeAccess(),
         ];
     }
 
