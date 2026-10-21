@@ -288,6 +288,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
                 "SELECT COUNT(*) FROM $pageViewTimeTable pvt
                  LEFT JOIN " . $targetDb->prefixTable('log_link_visit_action') . " lva
                      ON lva.idvisit = pvt.idvisit AND lva.idlink_va = pvt.idlink_va AND lva.idsite = pvt.idsite
+                     AND lva.idaction_url <=> pvt.idaction_url AND lva.idaction_name <=> pvt.idaction_name
                  WHERE lva.idlink_va IS NULL"
             ));
         }

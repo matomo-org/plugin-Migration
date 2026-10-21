@@ -2,6 +2,7 @@
 
 ### 6.0.1
 - Added migration of the per-pageview time on page that Matomo 6 records
+- When migrating logs from a source Matomo on 6.0.0-b6 or later, the target must be on 6.0.0-b6 or later too
 
 ### 6.0.0 - 2026-08-10
 - Compatibility with Matomo 6
