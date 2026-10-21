@@ -11,6 +11,7 @@ namespace Piwik\Plugins\Migration\Migrations;
 
 use Piwik\Common;
 use Piwik\Db;
+use Piwik\DbHelper;
 use Piwik\Plugins\Migration\Db\BatchQuery;
 use Piwik\Plugins\Migration\TargetDb;
 
@@ -23,7 +24,14 @@ class LogMigration extends BaseMigration
         $errors3 = $this->checkTablesHaveSameStructure($targetDb, 'log_action');
         $errors4 = $this->checkTablesHaveSameStructure($targetDb, 'log_conversion');
         $errors5 = $this->checkTablesHaveSameStructure($targetDb, 'log_conversion_item');
-        return array_merge($errors1, $errors2, $errors3, $errors4, $errors5);
+        $errors6 = [];
+        if ($this->hasPageViewTimeTable()) {
+            $targetTable = $targetDb->prefixTable('log_page_view_time');
+            $errors6 = $targetDb->doesTableExist($targetTable)
+                ? $this->checkTablesHaveSameStructure($targetDb, 'log_page_view_time')
+                : [sprintf('The table "%s" is missing in the target DB', $targetTable)];
+        }
+        return array_merge($errors1, $errors2, $errors3, $errors4, $errors5, $errors6);
     }
 
     public function migrate(Request $request, TargetDb $targetDb)
@@ -36,6 +44,7 @@ class LogMigration extends BaseMigration
         }
 
         $logActionMigration = new LogActionMigration();
+        $hasPageViewTimeTable = $this->hasPageViewTimeTable();
 
         $count = 0;
         $loggedAt = array(0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9);
@@ -51,7 +60,7 @@ class LogMigration extends BaseMigration
         $lastIdVisit = 0;
         while ($visitRows = Db::fetchAll($sql, [$request->sourceIdSite, $lastIdVisit])) {
             $count += count($visitRows);
-            $this->migrateVisits($visitRows, $request, $logActionMigration, $targetDb);
+            $this->migrateVisits($visitRows, $request, $logActionMigration, $targetDb, $hasPageViewTimeTable);
             $lastIdVisit = end($visitRows)['idvisit'];
 
             foreach ($loggedAt as $logAt) {
@@ -64,7 +73,7 @@ class LogMigration extends BaseMigration
         $this->log(sprintf('Migrated %s visits. The number of migrated visits may be higher if data is still tracked into the source Matomo while migrating the data', $count));
     }
 
-    private function migrateVisits($visitRows, Request $request, LogActionMigration $logActionMigration, TargetDb $targetDb)
+    private function migrateVisits($visitRows, Request $request, LogActionMigration $logActionMigration, TargetDb $targetDb, bool $hasPageViewTimeTable)
     {
         $visitorIdMap = array();
         $visitorLinkActionMap = array();
@@ -131,6 +140,25 @@ class LogMigration extends BaseMigration
 
         unset($rows);
 
+        if ($hasPageViewTimeTable) {
+            foreach ($batchQuery->generateQuery('SELECT * FROM ' . Common::prefixTable('log_page_view_time') . ' WHERE idvisit in (' . $visitorIds . ') ORDER BY idpageviewtime ASC') as $rows) {
+                foreach ($rows as $row) {
+                    // An action tracked after this batch's actions were copied has no counterpart in the target
+                    if (!isset($visitorLinkActionMap[$row['idlink_va']])) {
+                        continue;
+                    }
+                    $row['idvisit'] = $visitorIdMap[$row['idvisit']];
+                    $row['idlink_va'] = $visitorLinkActionMap[$row['idlink_va']];
+                    $row['idsite'] = $request->targetIdSite;
+                    $row['idaction_url'] = $logActionMigration->migrateAction($row['idaction_url'], $targetDb);
+                    $row['idaction_name'] = $logActionMigration->migrateAction($row['idaction_name'], $targetDb);
+                    unset($row['idpageviewtime']);
+                    $targetDb->insert('log_page_view_time', $row);
+                }
+            }
+            unset($rows);
+        }
+
         foreach ($visitRows as $visitRow) {
             $usesCustomDimensions = isset($visitRow['last_idlink_va']);
             $hasMapForIdLinkVa = $usesCustomDimensions && isset($visitorLinkActionMap[$visitRow['last_idlink_va']]);
@@ -138,11 +166,17 @@ class LogMigration extends BaseMigration
                 $newLastIdLinkVa = $visitorLinkActionMap[$visitRow['last_idlink_va']];
 
                 $targetDb->update('log_visit', array('last_idlink_va' => $newLastIdLinkVa), array(
-                    'idvisit' => $visitorIdMap[$visitRow['idvisit']]
+                    'idvisit' => $visitorIdMap[$visitRow['idvisit']],
                 ));
             }
         }
 
         unset($visitRows);
+    }
+
+    // Core only creates this table from 6.0.0-b6, and the plugin supports 6.0.0-b1 onwards.
+    private function hasPageViewTimeTable(): bool
+    {
+        return DbHelper::tableExists(Common::prefixTable('log_page_view_time'));
     }
 }

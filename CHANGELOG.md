@@ -1,5 +1,8 @@
 ## Changelog
 
+### 6.0.1
+- Added migration of the per-pageview time on page that Matomo 6 records
+
 ### 6.0.0 - 2026-08-10
 - Compatibility with Matomo 6
 
