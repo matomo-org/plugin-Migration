@@ -1,6 +1,6 @@
 ## Changelog
 
-### 6.0.2 - 2026-10-27
+### 6.0.2
 - Added migration of custom alerts and triggered-alert history for the selected website, including alerts shared with other websites
 
 ### 6.0.1 - 2026-10-26
