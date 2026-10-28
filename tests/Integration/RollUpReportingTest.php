@@ -179,6 +179,37 @@ class RollUpReportingTest extends IntegrationTestCase
         $this->assertStringContainsString("--sites=$targetB,$targetA --dates=", implode("\n", $messages));
     }
 
+    public function test_quotedTargetPrefixPreservesMembershipAndSettings(): void
+    {
+        $originalTarget = $this->targetDb;
+        $this->targetDb = new TargetDb(['tables_prefix' => 'migration_quoted`_']);
+        $created = [];
+        try {
+            foreach (['site', 'site_rollup', 'option', 'plugin_setting'] as $table) {
+                $source = Db::get()->quoteIdentifier([Common::prefixTable($table)]);
+                $target = Db::get()->quoteIdentifier([$this->targetDb->prefixTable($table)]);
+                Db::query("CREATE TABLE $target LIKE $source");
+                $created[] = $target;
+            }
+            $site = $this->createSourceSite('Quoted prefix member', true);
+            $rollUp = $this->createSourceSite('Quoted prefix roll-up', false, 'rollup');
+            $this->addSourceMembership($rollUp, $site);
+            [$targetRollUp] = $this->migrateRollUpStep($rollUp);
+            [$targetSite] = $this->migrateRollUpStep($site);
+            $members = Db::get()->quoteIdentifier([$this->targetDb->prefixTable('site_rollup')]);
+            $sites = Db::get()->quoteIdentifier([$this->targetDb->prefixTable('site')]);
+
+            $this->assertEquals([$targetSite], Db::get()->fetchCol("SELECT idsite FROM $members WHERE parent_idsite = ?", [$targetRollUp]));
+            $this->assertSame(1, (int) Db::fetchOne("SELECT ecommerce FROM $sites WHERE idsite = ?", [$targetRollUp]));
+            $this->assertSame(0, (int) Db::fetchOne('SELECT COUNT(*) FROM ' . self::TARGET_PREFIX . 'site_rollup'));
+        } finally {
+            foreach (array_reverse($created) as $quotedTable) {
+                Db::query("DROP TABLE $quotedTable");
+            }
+            $this->targetDb = $originalTarget;
+        }
+    }
+
     private function switchToOtherSource(string $sourceKind): void
     {
         $prefix = $this->originalPrefix;

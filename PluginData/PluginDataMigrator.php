@@ -196,7 +196,7 @@ class PluginDataMigrator
      */
     public function copySegmentOfAllWebsites($sourceId, IdMaps $maps, TargetDb $targetDb)
     {
-        $segment = Db::fetchRow('SELECT * FROM ' . Common::prefixTable('segment') . ' WHERE idsegment = ? AND enable_only_idsite = 0', [$sourceId]);
+        $segment = Db::fetchRow('SELECT * FROM ' . $this->quoteSourceTable('segment') . ' WHERE idsegment = ? AND enable_only_idsite = 0', [$sourceId]);
         if (empty($segment) || $this->targetIdSite === null) {
             return null;
         }
@@ -231,12 +231,12 @@ class PluginDataMigrator
             $copiedSegments[$idSegment] = [0, $targetIdSite];
         }
 
-        $segmentTable = $targetDb->prefixTable('segment');
+        $segmentTable = $targetDb->quoteTable('segment');
         $numChanged = 0;
         // Translate every copy before comparing definitions: a translated ID can equal another copy's source ID.
         foreach (array_keys($copiedSegments) as $idSegment) {
             // the copies belong to the target site, in a dry run nothing was inserted
-            $segment = $targetDb->fetchRow("SELECT * FROM `$segmentTable` WHERE idsegment = ? AND enable_only_idsite = ?", [$idSegment, $targetIdSite]);
+            $segment = $targetDb->fetchRow("SELECT * FROM $segmentTable WHERE idsegment = ? AND enable_only_idsite = ?", [$idSegment, $targetIdSite]);
             if (!is_array($segment) || !is_string($segment['definition'] ?? null)) {
                 continue;
             }
@@ -262,7 +262,7 @@ class PluginDataMigrator
         $pendingSegments = array_fill_keys(array_keys($copiedSegments), true);
         foreach ($copiedSegments as $idSegment => $sitesToReuse) {
             unset($pendingSegments[$idSegment]);
-            $segment = $targetDb->fetchRow("SELECT * FROM `$segmentTable` WHERE idsegment = ? AND enable_only_idsite = ?", [$idSegment, $targetIdSite]);
+            $segment = $targetDb->fetchRow("SELECT * FROM $segmentTable WHERE idsegment = ? AND enable_only_idsite = ?", [$idSegment, $targetIdSite]);
             if (
                 !is_array($segment) || !is_string($segment['definition'] ?? null)
                 || !SegmentsMigration::hasPluginDataIds($segment['definition'], $segmentTables)
@@ -273,11 +273,11 @@ class PluginDataMigrator
             // replaced by a global target segment. Reuse only existing segments and copies already settled.
             $pendingIds = array_map('intval', array_keys($pendingSegments));
             $existingId = $targetDb->fetchOne(
-                "SELECT idsegment FROM `$segmentTable` WHERE enable_only_idsite IN (" . implode(',', $sitesToReuse) . ')'
+                "SELECT idsegment FROM $segmentTable WHERE enable_only_idsite IN (" . Common::getSqlStringFieldsArray($sitesToReuse) . ')'
                 . ' AND `definition` = ? AND deleted = ? AND idsegment <> ?'
-                . ($pendingIds ? ' AND idsegment NOT IN (' . implode(',', $pendingIds) . ')' : '')
+                . ($pendingIds ? ' AND idsegment NOT IN (' . Common::getSqlStringFieldsArray($pendingIds) . ')' : '')
                 . ' ORDER BY enable_only_idsite DESC, idsegment LIMIT 1',
-                [$segment['definition'], $segment['deleted'], $idSegment]
+                array_merge($sitesToReuse, [$segment['definition'], $segment['deleted'], $idSegment], $pendingIds)
             );
             if ($existingId) {
                 $this->replaceSegment($idSegment, $this->toId($existingId), $request->idMaps, $targetDb);
@@ -394,7 +394,7 @@ class PluginDataMigrator
                 continue;
             }
 
-            if (!DbHelper::tableExists(Common::prefixTable($table))) {
+            if (!$this->doesSourceTableExist($table)) {
                 $errors[] = sprintf('The table "%s" of plugin %s does not exist in the source DB. Please make sure the plugin is installed correctly.', Common::prefixTable($table), $pluginName);
                 continue;
             }
@@ -414,7 +414,7 @@ class PluginDataMigrator
 
         foreach ($this->getDefinitionsToMigrate() as $definition) {
             foreach ($definition->getSiteStepTables() as $table) {
-                if (!DbHelper::tableExists(Common::prefixTable($table))) {
+                if (!$this->doesSourceTableExist($table)) {
                     $errors[] = sprintf('The table "%s" of plugin %s does not exist in the source DB. Please make sure the plugin is installed correctly.', Common::prefixTable($table), $definition->getPluginName());
                 } elseif (!$targetDb->doesTableExist($targetDb->prefixTable($table))) {
                     $errors[] = sprintf(
@@ -695,7 +695,7 @@ class PluginDataMigrator
         if ($siteLinkTable !== null) {
             // the rows are those the link table links to the site
             $linkedRows = $this->fetchRows(
-                sprintf('SELECT DISTINCT `%s` FROM `%s` WHERE `idsite` IN (%s)', $parentColumn, Common::prefixTable($siteLinkTable), Common::getSqlStringFieldsArray($parentIds)),
+                sprintf('SELECT DISTINCT %s FROM %s WHERE `idsite` IN (%s)', $this->quoteIdentifier($parentColumn), $this->quoteSourceTable($siteLinkTable), Common::getSqlStringFieldsArray($parentIds)),
                 $parentIds
             );
             $parentIds = array_map([$this, 'toId'], array_column($linkedRows, $parentColumn));
@@ -710,8 +710,8 @@ class PluginDataMigrator
         $severalSitesCondition = $tableDefinition->getSeveralSitesCondition();
         if ($severalSitesCondition !== null && $parentTable === TableDefinition::SITE && $siteLinkTable === null) {
             foreach ($parentIds as $idSite) {
-                $orderBy = $idColumn !== null ? sprintf(' ORDER BY `%s`', $idColumn) : '';
-                $sql = sprintf('SELECT * FROM `%s` WHERE `%s` <> ? AND (%s)%s', Common::prefixTable($table), $parentColumn, $severalSitesCondition, $orderBy);
+                $orderBy = $idColumn !== null ? sprintf(' ORDER BY %s', $this->quoteIdentifier($idColumn)) : '';
+                $sql = sprintf('SELECT * FROM %s WHERE %s <> ? AND (%s)%s', $this->quoteSourceTable($table), $this->quoteIdentifier($parentColumn), $severalSitesCondition, $orderBy);
                 $bind = array_merge([$idSite], array_fill(0, substr_count($severalSitesCondition, '?'), $idSite));
                 foreach ($this->fetchRows($sql, $bind) as $row) {
                     // copied as a row of the site
@@ -811,22 +811,22 @@ class PluginDataMigrator
                 $counts[$table] = $this->copyRowsOfSiteKeys($tableDefinition, $request, $targetDb, $logActionMigration);
                 continue;
             }
-            $sourceTable = Common::prefixTable($table);
+            $sourceTable = $this->quoteSourceTable($table);
             $idColumn = (string) $tableDefinition->getAutoIncrementColumn();
-            $where = sprintf('`%s` = ?', $tableDefinition->getParentColumn());
+            $where = sprintf('%s = ?', $this->quoteIdentifier((string) $tableDefinition->getParentColumn()));
             $bind = [$request->sourceIdSite];
             $columns = $this->getSourceColumns($table);
             $tableCounts = ['migrated' => 0, 'skipped' => 0, 'existing' => 0, 'duplicate' => 0, 'present' => 0];
 
-            $range = $this->fetchRows(sprintf('SELECT MIN(`%s`) AS first, MAX(`%s`) AS last FROM `%s` WHERE %s', $idColumn, $idColumn, $sourceTable, $where), $bind);
+            $range = $this->fetchRows(sprintf('SELECT MIN(%s) AS first, MAX(%s) AS last FROM %s WHERE %s', $this->quoteIdentifier($idColumn), $this->quoteIdentifier($idColumn), $sourceTable, $where), $bind);
             $first = $range[0]['first'] ?? null;
             if (!is_numeric($first)) {
                 $counts[$table] = $tableCounts;
                 continue;
             }
             // like the visits, the rows are read in the order of the primary key, see LogMigration
-            $sql = sprintf('SELECT * FROM `%s` FORCE INDEX (PRIMARY) WHERE `%s` > ? AND %s', $sourceTable, $idColumn, $where)
-                . sprintf(' ORDER BY `%s` ASC LIMIT %d', $idColumn, self::ROWS_PER_QUERY);
+            $sql = sprintf('SELECT * FROM %s FORCE INDEX (PRIMARY) WHERE %s > ? AND %s', $sourceTable, $this->quoteIdentifier($idColumn), $where)
+                . sprintf(' ORDER BY %s ASC LIMIT %d', $this->quoteIdentifier($idColumn), self::ROWS_PER_QUERY);
             $lastId = (int) $first - 1;
             do {
                 $rows = $this->fetchRows($sql, array_merge([$lastId], $bind));
@@ -856,18 +856,18 @@ class PluginDataMigrator
         $primaryKey = $this->getSourcePrimaryKey($table);
         $counts = ['migrated' => 0, 'skipped' => 0, 'existing' => 0, 'duplicate' => 0, 'present' => 0];
 
-        $where = sprintf('`%s` = ?', $keyColumn);
+        $where = sprintf('%s = ?', $this->quoteIdentifier($keyColumn));
         // the rows of a key are read in the order of the primary key
         $pageColumns = array_values(array_diff($primaryKey, [$keyColumn]));
         $pageColumnList = implode(', ', array_map(function ($column) {
-            return '`' . $column . '`';
+            return $this->quoteIdentifier($column);
         }, $pageColumns));
-        $sourceTable = Common::prefixTable($table);
+        $sourceTable = $this->quoteSourceTable($table);
 
         foreach (array_unique($tableDefinition->getSiteKeys($request->sourceIdSite) ?? []) as $key) {
             $lastRow = null;
             do {
-                $sql = sprintf('SELECT * FROM `%s` WHERE %s', $sourceTable, $where);
+                $sql = sprintf('SELECT * FROM %s WHERE %s', $sourceTable, $where);
                 $bind = [$key];
                 if ($lastRow !== null) {
                     $sql .= sprintf(' AND (%s) > (%s)', $pageColumnList, Common::getSqlStringFieldsArray($pageColumns));
@@ -905,10 +905,10 @@ class PluginDataMigrator
         $where = [];
         $bind = [];
         foreach ($primaryKey as $column) {
-            $where[] = sprintf('`%s` = ?', $column);
+            $where[] = sprintf('%s = ?', $targetDb->quoteIdentifier($column));
             $bind[] = $targetRow[$column];
         }
-        $sql = sprintf('SELECT 1 FROM `%s` WHERE %s LIMIT 1', $targetDb->prefixTable($tableDefinition->getTable()), implode(' AND ', $where));
+        $sql = sprintf('SELECT 1 FROM %s WHERE %s LIMIT 1', $targetDb->quoteTable($tableDefinition->getTable()), implode(' AND ', $where));
         if ($targetDb->fetchRow($sql, $bind)) {
             return 'present';
         }
@@ -930,27 +930,27 @@ class PluginDataMigrator
             return null;
         }
 
-        $targetTable = $targetDb->prefixTable($tableDefinition->getTable());
+        $targetTable = $targetDb->quoteTable($tableDefinition->getTable());
         $where = [];
         $bind = [];
         $siteLinkTable = $tableDefinition->getSiteLinkTable();
         if ($siteLinkTable !== null) {
             // the rows of the site are the ones its link table links to it
             $idColumn = (string) $tableDefinition->getParentColumn();
-            $where[] = sprintf('EXISTS (SELECT 1 FROM `%s` l WHERE l.`%s` = t.`%s` AND l.idsite = ?)', $targetDb->prefixTable($siteLinkTable), $idColumn, $idColumn);
+            $where[] = sprintf('EXISTS (SELECT 1 FROM %s l WHERE l.%s = t.%s AND l.idsite = ?)', $targetDb->quoteTable($siteLinkTable), $targetDb->quoteIdentifier($idColumn), $targetDb->quoteIdentifier($idColumn));
             $bind[] = $this->targetIdSite;
         } else {
             $parentColumn = (string) $tableDefinition->getParentColumn();
-            $where[] = sprintf('t.`%s` <=> ?', $parentColumn);
+            $where[] = sprintf('t.%s <=> ?', $targetDb->quoteIdentifier($parentColumn));
             $bind[] = $targetRow[$parentColumn] ?? null;
         }
         foreach ($identityColumns as $column) {
-            $where[] = sprintf('t.`%s` <=> ?', $column);
+            $where[] = sprintf('t.%s <=> ?', $targetDb->quoteIdentifier($column));
             $bind[] = $targetRow[$column] ?? null;
         }
 
         /** @var array<string, mixed>|false $row */
-        $row = $targetDb->fetchRow(sprintf('SELECT * FROM `%s` t WHERE %s LIMIT 1', $targetTable, implode(' AND ', $where)), $bind);
+        $row = $targetDb->fetchRow(sprintf('SELECT * FROM %s t WHERE %s LIMIT 1', $targetTable, implode(' AND ', $where)), $bind);
         return is_array($row) && !empty($row) ? $row : null;
     }
 
@@ -962,8 +962,8 @@ class PluginDataMigrator
     {
         $table = $tableDefinition->getTable();
         $column = (string) $tableDefinition->getUniqueKeyColumn();
-        $targetTable = $targetDb->prefixTable($table);
-        $sql = sprintf('SELECT 1 FROM `%s` WHERE `%s` = ? LIMIT 1', $targetTable, $column);
+        $targetTable = $targetDb->quoteTable($table);
+        $sql = sprintf('SELECT 1 FROM %s WHERE %s = ? LIMIT 1', $targetTable, $targetDb->quoteIdentifier($column));
         // in a dry run nothing is inserted, so the keys handed out are remembered to not hand them out twice
         $keysHandedOut = $this->uniqueKeysHandedOut[$table] ?? [];
         $sourceKey = $key;
@@ -977,7 +977,7 @@ class PluginDataMigrator
             }
             $newKey = $tableDefinition->generateUniqueKey();
             if ($newKey === null) {
-                $maxKey = $targetDb->fetchOne(sprintf('SELECT MAX(`%s`) FROM `%s`', $column, $targetTable));
+                $maxKey = $targetDb->fetchOne(sprintf('SELECT MAX(%s) FROM %s', $targetDb->quoteIdentifier($column), $targetTable));
                 $newKey = max(array_merge([is_numeric($maxKey) ? (int) $maxKey : 0], array_map('intval', array_keys($keysHandedOut)))) + 1;
             }
             $key = $newKey;
@@ -995,13 +995,20 @@ class PluginDataMigrator
      */
     private function fetchRowsOfParents(string $table, string $parentColumn, array $parentIds, ?string $idColumn): \Generator
     {
-        $sourceTable = Common::prefixTable($table);
+        $sourceTable = $this->quoteSourceTable($table);
         $numRowsPerParent = $this->fetchRows(
-            sprintf('SELECT `%s` AS parent, COUNT(*) AS num FROM `%s` WHERE `%s` IN (%s) GROUP BY `%s`', $parentColumn, $sourceTable, $parentColumn, Common::getSqlStringFieldsArray($parentIds), $parentColumn),
+            sprintf(
+                'SELECT %s AS parent, COUNT(*) AS num FROM %s WHERE %s IN (%s) GROUP BY %s',
+                $this->quoteIdentifier($parentColumn),
+                $sourceTable,
+                $this->quoteIdentifier($parentColumn),
+                Common::getSqlStringFieldsArray($parentIds),
+                $this->quoteIdentifier($parentColumn)
+            ),
             $parentIds
         );
         $orderBy = implode(', ', array_map(function ($column) {
-            return '`' . $column . '`';
+            return $this->quoteIdentifier($column);
         }, $idColumn !== null ? [$idColumn] : $this->getSourcePrimaryKey($table)));
         $orderBy = $orderBy === '' ? '' : ' ORDER BY ' . $orderBy;
 
@@ -1015,7 +1022,7 @@ class PluginDataMigrator
                 continue;
             }
             if ($groupSize + $numRows > self::ROWS_PER_QUERY) {
-                yield from $this->fetchRows(sprintf('SELECT * FROM `%s` WHERE `%s` IN (%s)%s', $sourceTable, $parentColumn, Common::getSqlStringFieldsArray($group), $orderBy), $group);
+                yield from $this->fetchRows(sprintf('SELECT * FROM %s WHERE %s IN (%s)%s', $sourceTable, $this->quoteIdentifier($parentColumn), Common::getSqlStringFieldsArray($group), $orderBy), $group);
                 $group = [];
                 $groupSize = 0;
             }
@@ -1023,7 +1030,7 @@ class PluginDataMigrator
             $groupSize += $numRows;
         }
         if (!empty($group)) {
-            yield from $this->fetchRows(sprintf('SELECT * FROM `%s` WHERE `%s` IN (%s)%s', $sourceTable, $parentColumn, Common::getSqlStringFieldsArray($group), $orderBy), $group);
+            yield from $this->fetchRows(sprintf('SELECT * FROM %s WHERE %s IN (%s)%s', $sourceTable, $this->quoteIdentifier($parentColumn), Common::getSqlStringFieldsArray($group), $orderBy), $group);
         }
     }
 
@@ -1033,7 +1040,7 @@ class PluginDataMigrator
      */
     private function fetchRowsOfParent(string $table, string $parentColumn, $parentId, ?string $idColumn, string $orderBy): \Generator
     {
-        $sql = sprintf('SELECT * FROM `%s` WHERE `%s` = ?', Common::prefixTable($table), $parentColumn);
+        $sql = sprintf('SELECT * FROM %s WHERE %s = ?', $this->quoteSourceTable($table), $this->quoteIdentifier($parentColumn));
         if ($idColumn !== null) {
             // the index on the parent column holds the primary key, so the rows are read in this order without sorting
             $lastId = null;
@@ -1041,10 +1048,10 @@ class PluginDataMigrator
                 $bind = [$parentId];
                 $pageSql = $sql;
                 if ($lastId !== null) {
-                    $pageSql .= sprintf(' AND `%s` > ?', $idColumn);
+                    $pageSql .= sprintf(' AND %s > ?', $this->quoteIdentifier($idColumn));
                     $bind[] = $lastId;
                 }
-                $rows = $this->fetchRows($pageSql . sprintf(' ORDER BY `%s` ASC LIMIT %d', $idColumn, self::ROWS_PER_QUERY), $bind);
+                $rows = $this->fetchRows($pageSql . sprintf(' ORDER BY %s ASC LIMIT %d', $this->quoteIdentifier($idColumn), self::ROWS_PER_QUERY), $bind);
                 foreach ($rows as $row) {
                     $lastId = $this->toId($row[$idColumn]);
                     yield $row;
@@ -1127,7 +1134,7 @@ class PluginDataMigrator
         }
 
         $autoIncrementColumn = (string) $tableDefinition->getAutoIncrementColumn();
-        $rows = $this->fetchRows(sprintf('SELECT * FROM `%s` WHERE `%s` = ?', Common::prefixTable($table), $autoIncrementColumn), [$sourceId]);
+        $rows = $this->fetchRows(sprintf('SELECT * FROM %s WHERE %s = ?', $this->quoteSourceTable($table), $this->quoteIdentifier($autoIncrementColumn)), [$sourceId]);
         if (empty($rows)) {
             return null;
         }
@@ -1172,10 +1179,10 @@ class PluginDataMigrator
         $where = [];
         $bind = [];
         foreach ($tableDefinition->getMatchColumns() as $column) {
-            $where[] = sprintf('`%s` <=> ?', $column);
+            $where[] = sprintf('%s <=> ?', $targetDb->quoteIdentifier($column));
             $bind[] = $targetRow[$column];
         }
-        $sql = sprintf('SELECT `%s` FROM `%s` WHERE %s LIMIT 1', $autoIncrementColumn, $targetDb->prefixTable($tableDefinition->getTable()), implode(' AND ', $where));
+        $sql = sprintf('SELECT %s FROM %s WHERE %s LIMIT 1', $targetDb->quoteIdentifier($autoIncrementColumn), $targetDb->quoteTable($tableDefinition->getTable()), implode(' AND ', $where));
         $existingRow = $targetDb->fetchRow($sql, $bind);
         return is_array($existingRow) && isset($existingRow[$autoIncrementColumn]) ? $this->toId($existingRow[$autoIncrementColumn]) : null;
     }
@@ -1185,7 +1192,7 @@ class PluginDataMigrator
      */
     private function isValueTaken(string $table, string $column, $value, TargetDb $targetDb): bool
     {
-        return (bool) $targetDb->fetchRow(sprintf('SELECT 1 FROM `%s` WHERE `%s` = ? LIMIT 1', $targetDb->prefixTable($table), $column), [$value]);
+        return (bool) $targetDb->fetchRow(sprintf('SELECT 1 FROM %s WHERE %s = ? LIMIT 1', $targetDb->quoteTable($table), $targetDb->quoteIdentifier($column)), [$value]);
     }
 
     /**
@@ -1392,7 +1399,7 @@ class PluginDataMigrator
             }
 
             if (in_array('idsite', $this->getSourceColumns($table), true)) {
-                $hasRowsOfSite = Db::fetchOne(sprintf('SELECT 1 FROM `%s` WHERE `idsite` = ? LIMIT 1', $prefixedTable), [$idSite]);
+                $hasRowsOfSite = Db::fetchOne(sprintf('SELECT 1 FROM %s WHERE `idsite` = ? LIMIT 1', $this->quoteIdentifier($prefixedTable)), [$idSite]);
                 if ($hasRowsOfSite) {
                     $tablesNotMigrated[] = $prefixedTable;
                 }
@@ -1491,9 +1498,12 @@ class PluginDataMigrator
     private function getSourceColumnDefinitions(string $table): array
     {
         if (!isset($this->sourceColumns[$table])) {
-            /** @var array<string, array<string, mixed>> $columns */
-            $columns = DbHelper::getTableColumns(Common::prefixTable($table));
-            $this->sourceColumns[$table] = $columns;
+            /** @var array<array{Field: string}&array<string, mixed>> $columns */
+            $columns = Db::fetchAll('SHOW COLUMNS FROM ' . $this->quoteSourceTable($table));
+            $this->sourceColumns[$table] = [];
+            foreach ($columns as $column) {
+                $this->sourceColumns[$table][$column['Field']] = $column;
+            }
         }
         return $this->sourceColumns[$table];
     }
@@ -1513,12 +1523,30 @@ class PluginDataMigrator
         return is_string($type) && preg_match('/int|decimal|float|double|bit/i', $type) ? 0 : '';
     }
 
+    private function quoteSourceTable(string $table): string
+    {
+        return $this->quoteIdentifier(Common::prefixTable($table));
+    }
+
+    private function doesSourceTableExist(string $table): bool
+    {
+        return (bool) Db::fetchOne('SHOW TABLES LIKE ?', [addcslashes(Common::prefixTable($table), '\\_%')]);
+    }
+
+    private function quoteIdentifier(string $identifier): string
+    {
+        // Quote a single name, including embedded backticks or dots, through the source adapter.
+        /** @var \Zend_Db_Adapter_Abstract $db Migration runs outside the tracker, using the regular DB adapter. */
+        $db = Db::get();
+        return $db->quoteIdentifier([$identifier]);
+    }
+
     /**
      * @return string[]
      */
     private function getSourcePrimaryKey(string $table): array
     {
-        $keys = Db::fetchAll(sprintf("SHOW KEYS FROM `%s` WHERE Key_name = 'PRIMARY'", Common::prefixTable($table)));
+        $keys = Db::fetchAll(sprintf("SHOW KEYS FROM %s WHERE Key_name = 'PRIMARY'", $this->quoteSourceTable($table)));
         usort($keys, function ($a, $b) {
             return $a['Seq_in_index'] <=> $b['Seq_in_index'];
         });

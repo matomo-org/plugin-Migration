@@ -11,6 +11,7 @@ namespace Piwik\Plugins\Migration\tests\Integration;
 
 use Piwik\Common;
 use Piwik\Db;
+use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
 use Piwik\Plugins\Migration\PluginData\PluginDefinition;
 use Piwik\Plugins\Migration\PluginData\PluginDefinitions;
@@ -116,6 +117,81 @@ class PluginDataMigratorTest extends IntegrationTestCase
             'The archive record pattern "/^MTest_items$/" or column pattern "/^shared_(\d+$/" of plugin Migration is not a valid regular expression.',
             'The reporting pages of the category "MTest_Items" of plugin Migration must refer to a site table having an auto increment or unique key column, "mtest_shared" is not one.',
         ], $this->validate($definition));
+    }
+
+    /**
+     * @dataProvider getQuotedIdentifierCases
+     */
+    public function test_migrateSiteData_quotesNamesAndPreservesSiteIsolation(bool $viaLink, int $rowCount): void
+    {
+        $table = 'mtest_quoted`table';
+        $linkTable = 'mtest_quoted`link';
+        $idColumn = 'item`id';
+        $nameColumn = 'report.value';
+        $id = Db::get()->quoteIdentifier([$idColumn]);
+        $name = Db::get()->quoteIdentifier([$nameColumn]);
+        $source = Db::get()->quoteIdentifier([Common::prefixTable($table)]);
+        $sourceLink = Db::get()->quoteIdentifier([Common::prefixTable($linkTable)]);
+        $target = Db::get()->quoteIdentifier([self::TARGET_PREFIX . $table]);
+        $targetLink = Db::get()->quoteIdentifier([self::TARGET_PREFIX . $linkTable]);
+        $created = [];
+        try {
+            foreach ([$source, $target] as $quotedTable) {
+                Db::query("CREATE TABLE $quotedTable ($id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, idsite INT UNSIGNED, $name VARCHAR(100))");
+                $created[] = $quotedTable;
+            }
+            foreach ([$sourceLink, $targetLink] as $quotedTable) {
+                Db::query("CREATE TABLE $quotedTable ($id INT UNSIGNED, idsite INT UNSIGNED)");
+                $created[] = $quotedTable;
+            }
+            $value = "report' OR 1=1 -- ";
+            for ($row = 1; $row <= $rowCount; $row++) {
+                Db::query("INSERT INTO $source ($id, idsite, $name) VALUES (?, ?, ?)", [$row, 1, $value]);
+                Db::query("INSERT INTO $sourceLink ($id, idsite) VALUES (?, ?)", [$row, 1]);
+            }
+            Db::query("INSERT INTO $source ($id, idsite, $name) VALUES (?, ?, ?)", [$rowCount + 1, 2, 'other site']);
+            Db::query("INSERT INTO $sourceLink ($id, idsite) VALUES (?, ?)", [$rowCount + 1, 2]);
+            Db::query("INSERT INTO $target ($id, idsite, $name) VALUES (?, ?, ?)", [10000, 3, 'existing']);
+
+            $definition = new PluginDefinition(self::PLUGIN_NAME);
+            $items = $viaLink ? TableDefinition::forSiteVia($table, $linkTable, $idColumn) : TableDefinition::forSite($table);
+            $definition->addTable($items->autoIncrement($idColumn));
+            if ($viaLink) {
+                $definition->addTable(TableDefinition::forSite($linkTable)->references($idColumn, $table));
+            }
+            $definitions = new PluginDefinitions();
+            $definitions->add($definition);
+            $migrator = new PluginDataMigrator($definitions);
+            $this->assertSame([], $migrator->validate($this->targetDb, true));
+            $request = new Request();
+            $request->sourceIdSite = 1;
+            $request->targetIdSite = 42;
+            $request->idMaps->set('site', 1, 42);
+            $counts = $migrator->migrateSiteData($request, $this->targetDb);
+
+            $this->assertSame($rowCount, $counts[$table]['migrated']);
+            $this->assertSame($rowCount, (int) Db::fetchOne("SELECT COUNT(*) FROM $target WHERE idsite = ? AND $name = ?", [42, $value]));
+            $this->assertSame($rowCount + 1, (int) Db::fetchOne("SELECT COUNT(*) FROM $target"));
+            $this->assertSame('existing', Db::fetchOne("SELECT $name FROM $target WHERE $id = ?", [10000]));
+            $this->assertSame(10001, (int) $request->idMaps->get($table, 1));
+            $this->assertSame($rowCount + 1, (int) Db::fetchOne("SELECT COUNT(*) FROM $source"));
+            if ($viaLink) {
+                $this->assertSame($rowCount, (int) Db::fetchOne("SELECT COUNT(*) FROM $targetLink WHERE idsite = ? AND $id > ?", [42, 10000]));
+            }
+        } finally {
+            foreach (array_reverse($created) as $quotedTable) {
+                Db::query("DROP TABLE $quotedTable");
+            }
+        }
+    }
+
+    public function getQuotedIdentifierCases(): array
+    {
+        return [
+            'batched parents' => [false, 2],
+            'paginated parent' => [false, 1001],
+            'site link table' => [true, 2],
+        ];
     }
 
     /**

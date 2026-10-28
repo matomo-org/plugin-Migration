@@ -50,7 +50,7 @@ final class AdvertisingConversionExport
     public static function keepAccessTokenUnlessUsed(#[\SensitiveParameter] $accessToken, array $row, IdResolver $resolver)
     {
         $targetDb = $resolver->getTargetDb();
-        $isUsed = $targetDb->fetchOne('SELECT 1 FROM `' . $targetDb->prefixTable('site_conversion_export') . '` WHERE access_token = ?', [$accessToken]);
+        $isUsed = $targetDb->fetchOne('SELECT 1 FROM ' . $targetDb->quoteTable('site_conversion_export') . ' WHERE access_token = ?', [$accessToken]);
         return $isUsed ? sha1(Common::getRandomString(50)) : $accessToken;
     }
 

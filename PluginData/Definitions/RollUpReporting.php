@@ -54,14 +54,14 @@ final class RollUpReporting
         $sourceIdSite = (int) $request->sourceIdSite;
         $targetIdSite = (int) $request->targetIdSite;
         self::rememberTargetSite($sourceIdSite, $targetIdSite, $targetDb);
-        $rollUpTable = Common::prefixTable('site_rollup');
+        $rollUpTable = self::quoteSourceTable('site_rollup');
         $messages = [];
         $hasUnscopedMapping = false;
 
         // the roll-ups of the source the site belongs to, the ones not migrated yet get the site when they are
         $rollUpsWithSite = [];
         $rollUpsNotMigrated = [];
-        foreach (Db::fetchAll("SELECT parent_idsite FROM `$rollUpTable` WHERE idsite = ? ORDER BY parent_idsite", [$sourceIdSite]) as $row) {
+        foreach (Db::fetchAll("SELECT parent_idsite FROM $rollUpTable WHERE idsite = ? ORDER BY parent_idsite", [$sourceIdSite]) as $row) {
             $idRollUp = self::getTargetSite((int) $row['parent_idsite'], $targetDb, $hasUnscopedMapping);
             if ($idRollUp === null || !self::isRollUp($idRollUp, $targetDb)) {
                 $rollUpsNotMigrated[] = (int) $row['parent_idsite'];
@@ -82,8 +82,8 @@ final class RollUpReporting
             }
         } elseif (Option::get(self::ALL_WEBSITES_OPTION . $sourceIdSite)) {
             self::setOption(self::ALL_WEBSITES_OPTION . $targetIdSite, (string) $targetIdSite, $targetDb);
-            $siteTable = $targetDb->prefixTable('site');
-            foreach ($targetDb->fetchAll("SELECT idsite FROM `$siteTable` WHERE `type` <> ? AND idsite <> ? ORDER BY idsite", [self::ROLL_UP_TYPE, $targetIdSite]) as $row) {
+            $siteTable = $targetDb->quoteTable('site');
+            foreach ($targetDb->fetchAll("SELECT idsite FROM $siteTable WHERE `type` <> ? AND idsite <> ? ORDER BY idsite", [self::ROLL_UP_TYPE, $targetIdSite]) as $row) {
                 self::addSiteToRollUp(self::toInt($row['idsite']), $targetIdSite, $targetDb);
             }
             self::syncRollUp($targetIdSite, $targetDb);
@@ -92,7 +92,7 @@ final class RollUpReporting
         } else {
             // the sites of the roll-up, the ones not migrated yet are added when they are
             $sitesNotMigrated = [];
-            foreach (Db::fetchAll("SELECT idsite FROM `$rollUpTable` WHERE parent_idsite = ? ORDER BY idsite", [$sourceIdSite]) as $row) {
+            foreach (Db::fetchAll("SELECT idsite FROM $rollUpTable WHERE parent_idsite = ? ORDER BY idsite", [$sourceIdSite]) as $row) {
                 $idSite = self::getTargetSite((int) $row['idsite'], $targetDb, $hasUnscopedMapping);
                 if ($idSite === null) {
                     $sitesNotMigrated[] = (int) $row['idsite'];
@@ -151,10 +151,10 @@ final class RollUpReporting
             return;
         }
         $visited[$idSite] = true;
-        $rollUpTable = $targetDb->prefixTable('site_rollup');
-        $siteTable = $targetDb->prefixTable('site');
+        $rollUpTable = $targetDb->quoteTable('site_rollup');
+        $siteTable = $targetDb->quoteTable('site');
         $parents = $targetDb->fetchAll(
-            "SELECT r.parent_idsite FROM `$rollUpTable` r JOIN `$siteTable` s ON s.idsite = r.parent_idsite"
+            "SELECT r.parent_idsite FROM $rollUpTable r JOIN $siteTable s ON s.idsite = r.parent_idsite"
             . ' WHERE r.idsite = ? AND s.`type` = ? ORDER BY r.parent_idsite DESC',
             [$idSite, self::ROLL_UP_TYPE]
         );
@@ -174,17 +174,18 @@ final class RollUpReporting
         if (empty($idSites)) {
             return;
         }
-        $siteTable = $targetDb->prefixTable('site');
+        $siteTable = $targetDb->quoteTable('site');
         $sites = $targetDb->fetchRow(
-            "SELECT MAX(ecommerce) AS ecommerce, MAX(sitesearch) AS sitesearch, MIN(ts_created) AS ts_created FROM `$siteTable` WHERE idsite IN (" . implode(',', $idSites) . ')'
+            "SELECT MAX(ecommerce) AS ecommerce, MAX(sitesearch) AS sitesearch, MIN(ts_created) AS ts_created FROM $siteTable WHERE idsite IN (" . Common::getSqlStringFieldsArray($idSites) . ')',
+            $idSites
         );
         if (!is_array($sites)) {
             return;
         }
         $columns = ['ecommerce' => self::toInt($sites['ecommerce']), 'sitesearch' => self::toInt($sites['sitesearch'])];
-        $settingTable = $targetDb->prefixTable('plugin_setting');
-        $syncCreationDate = $targetDb->fetchOne("SELECT setting_value FROM `$settingTable` WHERE plugin_name = 'RollUpReporting' AND setting_name = 'metric' AND user_login = ''");
-        $created = $targetDb->fetchOne("SELECT ts_created FROM `$siteTable` WHERE idsite = ?", [$idRollUp]);
+        $settingTable = $targetDb->quoteTable('plugin_setting');
+        $syncCreationDate = $targetDb->fetchOne("SELECT setting_value FROM $settingTable WHERE plugin_name = 'RollUpReporting' AND setting_name = 'metric' AND user_login = ''");
+        $created = $targetDb->fetchOne("SELECT ts_created FROM $siteTable WHERE idsite = ?", [$idRollUp]);
         if (!in_array($syncCreationDate, ['0', '', 'false'], true) && is_string($sites['ts_created']) && (!is_string($created) || $sites['ts_created'] < $created)) {
             $columns['ts_created'] = $sites['ts_created'];
         }
@@ -196,8 +197,8 @@ final class RollUpReporting
      */
     private static function getSitesOfRollUp(int $idRollUp, TargetDb $targetDb): array
     {
-        $rollUpTable = $targetDb->prefixTable('site_rollup');
-        $siteTable = $targetDb->prefixTable('site');
+        $rollUpTable = $targetDb->quoteTable('site_rollup');
+        $siteTable = $targetDb->quoteTable('site');
         $idSites = [];
         $rollUpsToVisit = [$idRollUp];
         $visited = [];
@@ -207,7 +208,7 @@ final class RollUpReporting
                 continue;
             }
             $visited[$id] = true;
-            $sites = $targetDb->fetchAll("SELECT s.idsite, s.`type` FROM `$rollUpTable` r JOIN `$siteTable` s ON s.idsite = r.idsite WHERE r.parent_idsite = ?", [$id]);
+            $sites = $targetDb->fetchAll("SELECT s.idsite, s.`type` FROM $rollUpTable r JOIN $siteTable s ON s.idsite = r.idsite WHERE r.parent_idsite = ?", [$id]);
             foreach ($sites as $site) {
                 $idSite = self::toInt($site['idsite']);
                 if ($site['type'] !== self::ROLL_UP_TYPE) {
@@ -225,8 +226,8 @@ final class RollUpReporting
      */
     private static function addSiteToRollUp(int $idSite, int $idRollUp, TargetDb $targetDb): bool
     {
-        $rollUpTable = $targetDb->prefixTable('site_rollup');
-        if ($idSite === $idRollUp || $targetDb->fetchOne("SELECT 1 FROM `$rollUpTable` WHERE parent_idsite = ? AND idsite = ?", [$idRollUp, $idSite])) {
+        $rollUpTable = $targetDb->quoteTable('site_rollup');
+        if ($idSite === $idRollUp || $targetDb->fetchOne("SELECT 1 FROM $rollUpTable WHERE parent_idsite = ? AND idsite = ?", [$idRollUp, $idSite])) {
             return false;
         }
         $targetDb->insert('site_rollup', ['parent_idsite' => $idRollUp, 'idsite' => $idSite]);
@@ -238,9 +239,9 @@ final class RollUpReporting
      */
     private static function getRollUpsOfAllWebsites(TargetDb $targetDb): array
     {
-        $optionTable = $targetDb->prefixTable('option');
+        $optionTable = $targetDb->quoteTable('option');
         $idRollUps = [];
-        foreach ($targetDb->fetchAll("SELECT option_name FROM `$optionTable` WHERE option_name LIKE ?", [self::ALL_WEBSITES_OPTION . '%']) as $row) {
+        foreach ($targetDb->fetchAll("SELECT option_name FROM $optionTable WHERE option_name LIKE ?", [self::ALL_WEBSITES_OPTION . '%']) as $row) {
             if (is_string($row['option_name']) && preg_match('/^' . self::ALL_WEBSITES_OPTION . '([1-9][0-9]*)$/', $row['option_name'], $matches) && self::isRollUp((int) $matches[1], $targetDb)) {
                 $idRollUps[] = (int) $matches[1];
             }
@@ -255,8 +256,8 @@ final class RollUpReporting
     private static function isRollUp(int $idSite, ?TargetDb $targetDb = null): bool
     {
         $type = $targetDb === null
-            ? Db::fetchOne('SELECT `type` FROM ' . Common::prefixTable('site') . ' WHERE idsite = ?', [$idSite])
-            : $targetDb->fetchOne('SELECT `type` FROM `' . $targetDb->prefixTable('site') . '` WHERE idsite = ?', [$idSite]);
+            ? Db::fetchOne('SELECT `type` FROM ' . self::quoteSourceTable('site') . ' WHERE idsite = ?', [$idSite])
+            : $targetDb->fetchOne('SELECT `type` FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$idSite]);
         return $type === self::ROLL_UP_TYPE;
     }
 
@@ -270,12 +271,12 @@ final class RollUpReporting
      */
     private static function getTargetSite(int $sourceIdSite, TargetDb $targetDb, bool &$hasUnscopedMapping): ?int
     {
-        $idSite = $targetDb->fetchOne('SELECT option_value FROM `' . $targetDb->prefixTable('option') . '` WHERE option_name = ?', [self::getMigratedSiteOption($sourceIdSite)]);
-        if (!is_numeric($idSite) || !$targetDb->fetchOne('SELECT 1 FROM `' . $targetDb->prefixTable('site') . '` WHERE idsite = ?', [$idSite])) {
+        $idSite = $targetDb->fetchOne('SELECT option_value FROM ' . $targetDb->quoteTable('option') . ' WHERE option_name = ?', [self::getMigratedSiteOption($sourceIdSite)]);
+        if (!is_numeric($idSite) || !$targetDb->fetchOne('SELECT 1 FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$idSite])) {
             // The old salt-only key may belong to another database or prefix. Never use it as a fallback.
             $legacyOption = self::MIGRATED_SITE_OPTION . substr(hash('sha256', 'Migration' . SettingsPiwik::getSalt()), 0, 16) . '_' . $sourceIdSite;
-            $legacyId = $targetDb->fetchOne('SELECT option_value FROM `' . $targetDb->prefixTable('option') . '` WHERE option_name = ?', [$legacyOption]);
-            if (is_numeric($legacyId) && $targetDb->fetchOne('SELECT 1 FROM `' . $targetDb->prefixTable('site') . '` WHERE idsite = ?', [$legacyId])) {
+            $legacyId = $targetDb->fetchOne('SELECT option_value FROM ' . $targetDb->quoteTable('option') . ' WHERE option_name = ?', [$legacyOption]);
+            if (is_numeric($legacyId) && $targetDb->fetchOne('SELECT 1 FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$legacyId])) {
                 $hasUnscopedMapping = true;
             }
             return null;
@@ -312,7 +313,7 @@ final class RollUpReporting
      */
     private static function describeSourceSites(array $idSites): string
     {
-        $names = array_column(Db::fetchAll('SELECT idsite, name FROM ' . Common::prefixTable('site') . ' WHERE idsite IN (' . implode(',', $idSites) . ')'), 'name', 'idsite');
+        $names = array_column(Db::fetchAll('SELECT idsite, name FROM ' . self::quoteSourceTable('site') . ' WHERE idsite IN (' . Common::getSqlStringFieldsArray($idSites) . ')', $idSites), 'name', 'idsite');
         return implode(', ', array_map(function ($idSite) use ($names) {
             return sprintf('"%s" (ID %s)', $names[$idSite] ?? '', $idSite);
         }, $idSites));
@@ -323,12 +324,19 @@ final class RollUpReporting
      */
     private static function getInvalidationCommand(array $idSites, Request $request): string
     {
-        $created = Db::fetchOne('SELECT ts_created FROM ' . Common::prefixTable('site') . ' WHERE idsite = ?', [$request->sourceIdSite]);
+        $created = Db::fetchOne('SELECT ts_created FROM ' . self::quoteSourceTable('site') . ' WHERE idsite = ?', [$request->sourceIdSite]);
         return sprintf(
             '"./console core:invalidate-report-data --sites=%s --dates=%s,%s" and "./console core:archive".',
             implode(',', $idSites),
             Date::factory(is_string($created) ? $created : 'today')->toString(),
             Date::today()->toString()
         );
+    }
+
+    private static function quoteSourceTable(string $table): string
+    {
+        /** @var \Zend_Db_Adapter_Abstract $db Migration runs outside the tracker, using the regular DB adapter. */
+        $db = Db::get();
+        return $db->quoteIdentifier([Common::prefixTable($table)]);
     }
 }

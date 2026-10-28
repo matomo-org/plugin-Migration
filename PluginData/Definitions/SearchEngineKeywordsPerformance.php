@@ -56,8 +56,10 @@ final class SearchEngineKeywordsPerformance
      */
     public static function getPropertiesOfSite(int $idSite, string $setting): array
     {
+        /** @var \Zend_Db_Adapter_Abstract $db Migration runs outside the tracker, using the regular DB adapter. */
+        $db = Db::get();
         $value = Db::fetchOne(
-            'SELECT setting_value FROM ' . Common::prefixTable('site_setting') . ' WHERE idsite = ? AND plugin_name = ? AND setting_name = ?',
+            'SELECT setting_value FROM ' . $db->quoteIdentifier([Common::prefixTable('site_setting')]) . ' WHERE idsite = ? AND plugin_name = ? AND setting_name = ?',
             [$idSite, self::PLUGIN_NAME, $setting]
         );
         if (!is_string($value)) {
