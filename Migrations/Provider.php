@@ -37,6 +37,13 @@ class Provider
             $migrations[] = new CustomDimensionMigration();
         }
 
+        if (
+            $pluginManager->isPluginActivated('CustomAlerts')
+            && $pluginManager->isPluginLoaded('CustomAlerts')
+        ) {
+            $migrations[] = new CustomAlertsMigration();
+        }
+
         if (!$skipLogs) {
             $migrations[] = new LogMigration();
         }

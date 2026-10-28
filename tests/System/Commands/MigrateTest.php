@@ -61,6 +61,10 @@ Processed AnnotationsMigration at 2019-01-10 02:48:01
 Processing CustomDimensionMigration at 2019-01-10 02:48:01
 Found 3 custom dimensions at 2019-01-10 02:48:01
 Processed CustomDimensionMigration at 2019-01-10 02:48:01
+Processing CustomAlertsMigration at 2019-01-10 02:48:01
+Migrated 0 custom alerts at 2019-01-10 02:48:01
+Migrated 0 triggered custom alerts at 2019-01-10 02:48:01
+Processed CustomAlertsMigration at 2019-01-10 02:48:01
 Processing LogMigration at 2019-01-10 02:48:01
 Found 2 visits at 2019-01-10 02:48:01
 Migrated 5% of visits at 2019-01-10 02:48:01

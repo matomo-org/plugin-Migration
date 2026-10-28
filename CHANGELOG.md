@@ -1,5 +1,8 @@
 ## Changelog
 
+### 6.0.2
+- Added migration of custom alerts and triggered-alert history for the selected website, including alerts shared with other websites
+
 ### 6.0.1 - 2026-10-26
 - Added migration of the per-pageview time on page that Matomo 6 records
 - When migrating logs from a source Matomo on 6.0.0-b6 or later, the target must be on 6.0.0-b6 or later too
