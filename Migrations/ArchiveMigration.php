@@ -12,11 +12,22 @@ namespace Piwik\Plugins\Migration\Migrations;
 use Piwik\Common;
 use Piwik\DataAccess\ArchiveTableCreator;
 use Piwik\Plugins\Migration\Db\BatchQuery;
+use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
 use Piwik\Plugins\Migration\TargetDb;
 
 class ArchiveMigration extends BaseMigration
 {
     private $idArchiveMap = array();
+
+    /**
+     * @var PluginDataMigrator|null
+     */
+    private $pluginDataMigrator;
+
+    public function __construct(?PluginDataMigrator $pluginDataMigrator = null)
+    {
+        $this->pluginDataMigrator = $pluginDataMigrator;
+    }
 
     public function validateStructure(TargetDb $targetDb)
     {
@@ -46,10 +57,23 @@ class ArchiveMigration extends BaseMigration
             $archiveTable = str_replace($sourcePrefix, '', $archiveTable);
             $targetDb->createArchiveTableIfNeeded($archiveTable);
 
+            $numSkippedRecords = 0;
             $batchQuery = new BatchQuery($limit = 1000);
             $archiveTablePrefixed = Common::prefixTable($archiveTable);
             foreach ($batchQuery->generateQuery('SELECT * FROM ' . $archiveTablePrefixed . ' WHERE idsite = ? ORDER BY idarchive,`name` ASC', array($request->sourceIdSite)) as $archives) {
                 foreach ($archives as $archive) {
+                    if (!empty($archive['idarchive']) && $this->pluginDataMigrator) {
+                        // the name of some plugin records contains the ID of a row of a plugin table, which may be different on the target
+                        $name = $this->pluginDataMigrator->getTargetArchiveRecordName($archive['name'], $request->idMaps);
+                        if ($name === null) {
+                            $numSkippedRecords++;
+                            continue;
+                        }
+                        if (strpos($archiveTable, 'archive_blob_') === 0) {
+                            $archive['value'] = $this->pluginDataMigrator->getTargetArchiveBlobValue($archive['name'], $archive['value'], $request->idMaps);
+                        }
+                        $archive['name'] = $name;
+                    }
                     if (!empty($archive['idarchive'])) {
                         $archive['idarchive'] = $this->createArchiveId($targetDb, $archiveTable, $archive['idarchive']);
                         $archive['idsite']    = $request->targetIdSite;
@@ -68,6 +92,9 @@ class ArchiveMigration extends BaseMigration
                         }
                     }
                 }
+            }
+            if ($numSkippedRecords) {
+                $this->log(sprintf('Skipped %s archive records of plugin data that was not migrated', $numSkippedRecords));
             }
             $this->log('Migrated archive table ' . $archiveTable);
         }

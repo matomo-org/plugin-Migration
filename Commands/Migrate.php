@@ -36,6 +36,7 @@ class Migrate extends ConsoleCommand
         $this->addNoValueOption('target-db-ssl-no-verify', null, 'Disable server certificate validation of the target database host.');
         $this->addNoValueOption('skip-logs', null, 'Skip migration of logs');
         $this->addNoValueOption('skip-archives', null, 'Skip migration of archives');
+        $this->addOptionalValueOption('skip-plugin-data', null, 'Comma separated list of plugins whose data should not be migrated, eg "HeatmapSessionRecording,Funnels"');
         $this->addNoValueOption('dry-run', null, 'Enable debug mode where it does not insert anything.');
         $this->addNoValueOption('disable-db-transactions', null, 'Disable the usage of MySQL database transactions');
     }
@@ -71,7 +72,8 @@ class Migrate extends ConsoleCommand
         $errors = array();
 
         $migrationsProvider = new Provider();
-        $allMigrations = $migrationsProvider->getAllMigrations($input->getOption('skip-logs'), $input->getOption('skip-archives'));
+        $skipPluginData = array_values(array_filter(array_map('trim', explode(',', (string) $input->getOption('skip-plugin-data')))));
+        $allMigrations = $migrationsProvider->getAllMigrations($input->getOption('skip-logs'), $input->getOption('skip-archives'), $skipPluginData);
         foreach ($allMigrations as $migration) {
             $errors = array_merge($errors, $migration->validateStructure($targetDb));
             $migration->onLog(array($this, 'logMessage'));

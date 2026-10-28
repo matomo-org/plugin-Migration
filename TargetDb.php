@@ -75,6 +75,11 @@ class TargetDb
         return $this->db->fetchRow($sql, $bind, $fetchMode);
     }
 
+    public function fetchOne($sql, $bind = [])
+    {
+        return $this->db->fetchOne($sql, $bind);
+    }
+
     /**
      * @ignore tests only
      */
@@ -176,6 +181,35 @@ class TargetDb
         return $sequence->getNextId();
     }
 
+    public function fetchCol($sql, $bind = [])
+    {
+        return $this->db->fetchCol($sql, $bind);
+    }
+
+    /**
+     * @return array<array<string, mixed>>
+     */
+    public function fetchAll($sql, $bind = [])
+    {
+        return $this->db->fetchAll($sql, $bind);
+    }
+
+    /**
+     * @param array<string, int|string> $whereColumns
+     */
+    public function delete(string $table, array $whereColumns): void
+    {
+        if ($this->dryRun || empty($whereColumns)) {
+            return;
+        }
+
+        $where = [];
+        foreach (array_keys($whereColumns) as $column) {
+            $where[] = "`$column` = ?";
+        }
+        $this->db->query(sprintf('DELETE FROM `%s` WHERE %s', $this->prefixTable($table), implode(' AND ', $where)), array_values($whereColumns));
+    }
+
     public function prefixTable($table)
     {
         return $this->config['tables_prefix'] . $table;
@@ -203,6 +237,10 @@ class TargetDb
 
     public function update($table, $columns, $whereColumns)
     {
+        if ($this->dryRun) {
+            return;
+        }
+
         if (!empty($columns)) {
             $fields = [];
             $bind = [];

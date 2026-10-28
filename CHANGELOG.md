@@ -1,5 +1,8 @@
 ## Changelog
 
+### 6.1.0
+- Added migration of premium-plugin data for a website, including plugin configuration, raw data and references in historical reports
+
 ### 6.0.1 - 2026-10-26
 - Added migration of the per-pageview time on page that Matomo 6 records
 - When migrating logs from a source Matomo on 6.0.0-b6 or later, the target must be on 6.0.0-b6 or later too

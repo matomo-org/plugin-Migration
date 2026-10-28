@@ -61,6 +61,15 @@ Processed AnnotationsMigration at 2019-01-10 02:48:01
 Processing CustomDimensionMigration at 2019-01-10 02:48:01
 Found 3 custom dimensions at 2019-01-10 02:48:01
 Processed CustomDimensionMigration at 2019-01-10 02:48:01
+Processing PluginDataMigration at 2019-01-10 02:48:01
+The table tagmanager_container has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_container_release has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_container_version has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_tag has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_trigger has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_variable has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+Found 0 plugins with data to migrate at 2019-01-10 02:48:01
+Processed PluginDataMigration at 2019-01-10 02:48:01
 Processing LogMigration at 2019-01-10 02:48:01
 Found 2 visits at 2019-01-10 02:48:01
 Migrated 5% of visits at 2019-01-10 02:48:01

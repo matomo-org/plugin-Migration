@@ -41,9 +41,12 @@ abstract class BaseMigration
         foreach ($rows as $row) {
             $row[$idSiteColumnName] = $request->targetIdSite;
             if ($unsetId) {
+                $sourceId = $row[$unsetId];
                 unset($row[$unsetId]);
+                $request->idMaps->set($tableUnprefixed, $sourceId, $targetDb->insert($tableUnprefixed, $row));
+            } else {
+                $targetDb->insert($tableUnprefixed, $row);
             }
-            $targetDb->insert($tableUnprefixed, $row);
         }
     }
 
@@ -69,6 +72,27 @@ abstract class BaseMigration
         }
 
         return $errors;
+    }
+
+    /**
+     * @param array{migrated: int, skipped: int, existing?: int, duplicate?: int, present?: int} $counts
+     */
+    protected function logRowCounts(string $table, array $counts): void
+    {
+        $message = sprintf('Migrated %s rows of %s', $counts['migrated'], $table);
+        if (!empty($counts['existing'])) {
+            $message .= sprintf(', %s rows the existing site had already', $counts['existing']);
+        }
+        if (!empty($counts['present'])) {
+            $message .= sprintf(', %s rows the target had already', $counts['present']);
+        }
+        if ($counts['skipped']) {
+            $message .= sprintf(', skipped %s rows referencing data that was not migrated', $counts['skipped']);
+        }
+        if (!empty($counts['duplicate'])) {
+            $message .= sprintf(', skipped %s rows of all or several sites, as the site has another row with the same identity, eg name', $counts['duplicate']);
+        }
+        $this->log($message);
     }
 
     protected function log($message)
