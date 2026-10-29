@@ -70,6 +70,10 @@ The table tagmanager_trigger has data of this site that is not migrated, as no p
 The table tagmanager_variable has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
 Found 0 plugins with data to migrate at 2019-01-10 02:48:01
 Processed PluginDataMigration at 2019-01-10 02:48:01
+Processing CustomAlertsMigration at 2019-01-10 02:48:01
+Migrated 0 custom alerts at 2019-01-10 02:48:01
+Migrated 0 triggered custom alerts at 2019-01-10 02:48:01
+Processed CustomAlertsMigration at 2019-01-10 02:48:01
 Processing LogMigration at 2019-01-10 02:48:01
 Found 2 visits at 2019-01-10 02:48:01
 Migrated 5% of visits at 2019-01-10 02:48:01

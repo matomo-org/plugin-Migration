@@ -65,6 +65,19 @@ Please note that the migration can take a while depending on the amount of data 
 
 No data from the original Matomo instance will be deleted, only new data will be added to the new Matomo instance.
 
+### Custom alerts
+
+If CustomAlerts is active on the source, the selected website's alert definitions and triggered history are copied.
+Install CustomAlerts with matching tables on the destination. Shared alerts are assigned only to the new destination
+website; definitions needed only by historical snapshots are copied without assigning them to the website.
+
+Alerts are migrated after premium plugin configuration. Report references and custom-metric IDs in each definition
+and historical snapshot are translated independently, preserving the report used when the alert fired. If a known
+reference cannot be translated because its data is missing or its plugin is excluded, the migration stops with an
+explanation. With database transactions enabled, changes are rolled back. A dry run also reports unresolved references.
+Alert owners and notification settings are retained; ensure the owners exist and have access to the destination
+website and configure its notification integrations.
+
 ### Premium plugin data
 
 The migration copies the selected website's plugin configuration and raw data for the plugins listed below.
@@ -129,3 +142,7 @@ The synthetic plugin-data tests run without premium packages. `MigratePremiumPlu
 and compares real data through the installed premium plugins; it skips when none are installed. To require all
 12 supported premium plugins in a licensed test installation, set `MIGRATION_REQUIRE_PREMIUM_PLUGINS=1` when
 running the suite. Premium packages and license keys must not be included in this repository.
+=======
+If CustomAlerts is active on the source instance, its alert definitions and triggered history for the selected website are also copied. Install CustomAlerts with the same database structure on the destination before migrating.
+An alert shared with other source websites is copied with a mapping only to the newly created destination website.
+Historical snapshots are preserved, including alerts that are no longer assigned to the selected website; those alerts remain unassigned on the destination. Alert owners and notification settings are copied as stored, so ensure the owners exist and have access to the destination website, and configure the corresponding notification integrations there.

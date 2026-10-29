@@ -43,6 +43,13 @@ class Provider
         $pluginDataMigrator = new PluginDataMigrator(PluginDefinitions::collect(), $skipPluginData);
         $migrations[] = new PluginDataMigration($pluginDataMigrator, !$skipLogs);
 
+        if (
+            $pluginManager->isPluginActivated('CustomAlerts')
+            && $pluginManager->isPluginLoaded('CustomAlerts')
+        ) {
+            $migrations[] = new CustomAlertsMigration($pluginDataMigrator);
+        }
+
         if (!$skipLogs) {
             $migrations[] = new LogMigration($pluginDataMigrator);
         }
