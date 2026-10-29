@@ -142,7 +142,3 @@ The synthetic plugin-data tests run without premium packages. `MigratePremiumPlu
 and compares real data through the installed premium plugins; it skips when none are installed. To require all
 12 supported premium plugins in a licensed test installation, set `MIGRATION_REQUIRE_PREMIUM_PLUGINS=1` when
 running the suite. Premium packages and license keys must not be included in this repository.
-=======
-If CustomAlerts is active on the source instance, its alert definitions and triggered history for the selected website are also copied. Install CustomAlerts with the same database structure on the destination before migrating.
-An alert shared with other source websites is copied with a mapping only to the newly created destination website.
-Historical snapshots are preserved, including alerts that are no longer assigned to the selected website; those alerts remain unassigned on the destination. Alert owners and notification settings are copied as stored, so ensure the owners exist and have access to the destination website, and configure the corresponding notification integrations there.

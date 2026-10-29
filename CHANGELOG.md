@@ -2,10 +2,8 @@
 
 ### 6.1.0
 - Added migration of premium-plugin data for a website, including plugin configuration, raw data and references in historical reports
-- Translate premium-report references and custom-metric IDs in custom alerts and triggered history after migrating plugin data
-
-### 6.0.2
 - Added migration of custom alerts and triggered-alert history for the selected website, including alerts shared with other websites
+- Translate premium-report references and custom-metric IDs in custom alerts and triggered history after migrating plugin data
 
 ### 6.0.1 - 2026-10-26
 - Added migration of the per-pageview time on page that Matomo 6 records

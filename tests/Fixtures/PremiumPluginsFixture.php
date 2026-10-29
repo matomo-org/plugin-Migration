@@ -38,7 +38,7 @@ class PremiumPluginsFixture extends MigrationFixture
 
     public function __construct()
     {
-        $this->extraPluginsToLoad = array_values(array_filter(self::getPremiumPluginsWithDefinition(), function ($pluginName) {
+        $this->extraPluginsToLoad = array_values(array_filter(array_merge(['CustomAlerts'], self::getPremiumPluginsWithDefinition()), function ($pluginName) {
             return is_file(Plugin\Manager::getPluginDirectory($pluginName) . '/plugin.json');
         }));
     }

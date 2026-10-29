@@ -10,6 +10,7 @@
 namespace Piwik\Plugins\Migration\tests\System\Commands;
 
 use Piwik\Access;
+use Piwik\Common;
 use Piwik\DataTable\Row;
 use Piwik\Db;
 use Piwik\Plugins\Migration\tests\Fixtures\MigrationFixture;
@@ -243,6 +244,90 @@ class MigratePremiumPluginsTest extends ConsoleCommandTestCase
         $this->assertEquals(0, $this->runCommand(), $this->applicationTester->getDisplay());
         $this->assertStringContainsString(sprintf('The site belongs to the roll-ups "Shops roll-up" (ID %s) of the source Matomo, which were not migrated yet', $shopsRollUp), $this->applicationTester->getDisplay());
         $this->assertEquals([$site, $newSite], $this->getRollUpSites($targetShopsRollUp));
+    }
+
+    public function test_runMigration_translatesCustomAlertReportsAndHistoryWithLicensedCustomReports()
+    {
+        if (!PremiumPluginsFixture::isPluginActivated('CustomReports')) {
+            $this->markTestSkipped('CustomReports is required for this combined integration test.');
+        }
+        $this->assertTrue(PremiumPluginsFixture::isPluginActivated('CustomAlerts'));
+        $targetDb = self::$fixture->targetDb;
+        $site = Db::fetchRow('SELECT * FROM site WHERE idsite = ?', [self::$fixture->idSite]);
+        unset($site['idsite']);
+        $site['name'] = 'Existing site with occupied premium IDs';
+        $occupiedSite = $targetDb->insert('site', $site);
+        $reportTemplate = Db::fetchRow('SELECT * FROM custom_reports WHERE idsite = ? ORDER BY idcustomreport LIMIT 1', [self::$fixture->idSite]);
+        $metricTemplate = Db::fetchRow('SELECT * FROM custom_metrics ORDER BY idcustommetric LIMIT 1');
+        foreach ([1001 => 'current', 1002 => 'historical'] as $id => $kind) {
+            $metric = array_merge($metricTemplate, ['idcustommetric' => $id, 'name' => 'Integration ' . $kind . ' metric', 'formula' => '{{nb_visits}} + ' . $id]);
+            Db::get()->insert(Common::prefixTable('custom_metrics'), $metric);
+            $targetDb->insert('custom_metrics', array_merge($metric, ['name' => 'Occupied metric ' . $id]));
+            $report = array_merge($reportTemplate, [
+                'idcustomreport' => $id, 'name' => 'Integration ' . $kind . ' report',
+                'metrics' => json_encode(['custom_metric_' . $id]),
+            ]);
+            Db::get()->insert(Common::prefixTable('custom_reports'), $report);
+            $targetDb->insert('custom_reports', array_merge($report, ['idsite' => $occupiedSite, 'name' => 'Occupied report ' . $id]));
+        }
+        $firstAlert = (int) Db::fetchOne('SELECT COALESCE(MAX(idalert), 0) FROM alert') + 1;
+        foreach ([$firstAlert, $firstAlert + 1] as $idAlert) {
+            $alert = [
+                'idalert' => $idAlert, 'name' => 'Integration alert ' . $idAlert, 'login' => 'alert_owner', 'period' => 'day',
+                'report' => 'CustomReports_getCustomReport_idCustomReport--1001', 'metric' => 'custom_metric_1001',
+                'metric_condition' => 'less_than', 'metric_matched' => 5, 'compared_to' => 7, 'email_me' => 0,
+            ];
+            Db::get()->insert(Common::prefixTable('alert'), $alert);
+            if ($idAlert === $firstAlert) {
+                Db::get()->insert(Common::prefixTable('alert_site'), ['idalert' => $idAlert, 'idsite' => self::$fixture->idSite]);
+            }
+            Db::get()->insert(Common::prefixTable('alert_triggered'), array_merge($alert, [
+                'idsite' => self::$fixture->idSite, 'ts_triggered' => '2013-01-24 00:00:00', 'ts_last_sent' => '2013-01-24 01:00:00',
+                'name' => 'Historical name ' . $idAlert, 'value_old' => '20.125', 'value_new' => '4.500',
+                'report' => 'CustomReports_getCustomReport_idCustomReport--1002', 'metric' => 'custom_metric_1002',
+            ]));
+        }
+        $sourceHistory = Db::fetchAll('SELECT * FROM alert_triggered WHERE idalert IN (?, ?) ORDER BY idtriggered', [$firstAlert, $firstAlert + 1]);
+        $occupiedReports = Db::fetchAll('SELECT * FROM ' . self::TARGET_PREFIX . 'custom_reports WHERE idsite = ? ORDER BY idcustomreport', [$occupiedSite]);
+
+        try {
+            // Alert history must be migrated even when visit logs and archived reports are excluded.
+            $result = $this->runCommand(['--skip-logs' => true, '--skip-archives' => true]);
+            $this->assertEquals(0, $result, $this->applicationTester->getDisplay());
+            $targetSite = $this->getMaxTargetIdSite();
+            $ids = [];
+            foreach (['current', 'historical'] as $kind) {
+                $ids[$kind]['report'] = Db::fetchOne('SELECT idcustomreport FROM ' . self::TARGET_PREFIX . 'custom_reports WHERE idsite = ? AND name = ?', [$targetSite, 'Integration ' . $kind . ' report']);
+                $ids[$kind]['metric'] = Db::fetchOne('SELECT idcustommetric FROM ' . self::TARGET_PREFIX . 'custom_metrics WHERE name = ?', ['Integration ' . $kind . ' metric']);
+                $this->assertNotEmpty($ids[$kind]['report']);
+                $this->assertNotEmpty($ids[$kind]['metric']);
+                $this->assertNotContains((int) $ids[$kind]['report'], [1001, 1002]);
+                $this->assertNotContains((int) $ids[$kind]['metric'], [1001, 1002]);
+            }
+            $history = Db::fetchAll('SELECT * FROM ' . self::TARGET_PREFIX . 'alert_triggered WHERE idsite = ? ORDER BY idtriggered', [$targetSite]);
+            $this->assertCount(2, $history);
+            $this->assertEquals(1, Db::fetchOne('SELECT COUNT(*) FROM ' . self::TARGET_PREFIX . 'alert_site WHERE idsite = ?', [$targetSite]));
+            foreach ($history as $offset => $snapshot) {
+                $alert = $targetDb->fetchRow('SELECT * FROM ' . $targetDb->quoteTable('alert') . ' WHERE idalert = ?', [$snapshot['idalert']]);
+                $this->assertSame('CustomReports_getCustomReport_idCustomReport--' . $ids['current']['report'], $alert['report']);
+                $this->assertSame('custom_metric_' . $ids['current']['metric'], $alert['metric']);
+                $expected = array_merge($sourceHistory[$offset], [
+                    'idalert' => $snapshot['idalert'], 'idsite' => (string) $targetSite,
+                    'report' => 'CustomReports_getCustomReport_idCustomReport--' . $ids['historical']['report'],
+                    'metric' => 'custom_metric_' . $ids['historical']['metric'],
+                ]);
+                unset($expected['idtriggered'], $snapshot['idtriggered']);
+                $this->assertEquals($expected, $snapshot);
+            }
+            $this->assertSame($sourceHistory, Db::fetchAll('SELECT * FROM alert_triggered WHERE idalert IN (?, ?) ORDER BY idtriggered', [$firstAlert, $firstAlert + 1]));
+            $this->assertSame($occupiedReports, Db::fetchAll('SELECT * FROM ' . self::TARGET_PREFIX . 'custom_reports WHERE idsite = ? ORDER BY idcustomreport', [$occupiedSite]));
+        } finally {
+            foreach (['alert_triggered', 'alert_site', 'alert'] as $table) {
+                Db::query('DELETE FROM ' . Db::get()->quoteIdentifier([Common::prefixTable($table)]) . ' WHERE idalert IN (?, ?)', [$firstAlert, $firstAlert + 1]);
+            }
+            Db::query('DELETE FROM custom_reports WHERE idcustomreport IN (?, ?)', [1001, 1002]);
+            Db::query('DELETE FROM custom_metrics WHERE idcustommetric IN (?, ?)', [1001, 1002]);
+        }
     }
 
     /**

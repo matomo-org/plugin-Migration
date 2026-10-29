@@ -1381,6 +1381,11 @@ class PluginDataMigrator
             self::TABLES_MIGRATED_BY_CORE_MIGRATIONS,
             $this->getTablesToMigrate()
         );
+        $pluginManager = Plugin\Manager::getInstance();
+        if ($pluginManager->isPluginActivated('CustomAlerts') && $pluginManager->isPluginLoaded('CustomAlerts')) {
+            // Provider migrates these tables separately, after the premium-report ID maps have been built.
+            $knownTables = array_merge($knownTables, ['alert', 'alert_site', 'alert_triggered']);
+        }
 
         $tablesNotMigrated = [];
         foreach (Db::fetchAll('SHOW TABLES') as $row) {
