@@ -164,8 +164,17 @@ class MigrateFailureTest extends ConsoleCommandTestCase
     {
         Db::query('DROP TABLE ' . self::PREFIX . 'sequence');
         $before = $this->targetRows();
-        $this->assertNotSame(0, $this->runCommand());
-        $this->assertStringContainsString(self::PREFIX . 'sequence', $this->applicationTester->getDisplay());
+        // Console rendering can wrap the table name across lines; assert the original exception instead.
+        $this->application->setCatchExceptions(false);
+        try {
+            $this->runCommand();
+            $this->fail('Archive preparation must fail when the destination sequence table is missing.');
+        } catch (\Zend_Db_Statement_Exception $exception) {
+            $this->assertStringContainsString('SQLSTATE[42S02]', $exception->getMessage());
+            $this->assertStringContainsString(self::PREFIX . 'sequence', $exception->getMessage());
+        } finally {
+            $this->application->setCatchExceptions(true);
+        }
         $this->assertTargetUnchanged($before);
     }
 
