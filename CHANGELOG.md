@@ -1,7 +1,15 @@
 ## Changelog
 
-### 6.0.2
+### 6.1.0
+- Added migration of premium-plugin data for a website, including plugin configuration, raw data and references in historical reports
 - Added migration of custom alerts and triggered-alert history for the selected website, including alerts shared with other websites
+- Translate premium-report references and custom-metric IDs in custom alerts and triggered history after migrating plugin data
+- Prepare destination archive tables before copying data so later failures can roll back the migration
+- Report unreadable encrypted search-engine property settings instead of silently skipping their imported data
+- Keep roll-up site mappings separate between source database endpoints
+- Keep renamed custom metrics within the destination column length when names conflict
+- Handle archive-like table prefixes and preserve destination archive ID sequences
+- Stop when a custom metric's reference to another source site would change meaning on the destination
 
 ### 6.0.1 - 2026-10-26
 - Added migration of the per-pageview time on page that Matomo 6 records

@@ -10,15 +10,18 @@
 namespace Piwik\Plugins\Migration\Migrations;
 
 use Piwik\Plugin;
+use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
+use Piwik\Plugins\Migration\PluginData\PluginDefinitions;
 
 class Provider
 {
     /**
      * @param $skipLogs
      * @param $skipArchives
+     * @param string[] $skipPluginData plugins whose data is not migrated
      * @return BaseMigration[]
      */
-    public function getAllMigrations($skipLogs, $skipArchives)
+    public function getAllMigrations($skipLogs, $skipArchives, array $skipPluginData = [])
     {
         $migrations = [
             new SiteMigration(),
@@ -37,19 +40,22 @@ class Provider
             $migrations[] = new CustomDimensionMigration();
         }
 
+        $pluginDataMigrator = new PluginDataMigrator(PluginDefinitions::collect(), $skipPluginData);
+        $migrations[] = new PluginDataMigration($pluginDataMigrator, !$skipLogs);
+
         if (
             $pluginManager->isPluginActivated('CustomAlerts')
             && $pluginManager->isPluginLoaded('CustomAlerts')
         ) {
-            $migrations[] = new CustomAlertsMigration();
+            $migrations[] = new CustomAlertsMigration($pluginDataMigrator);
         }
 
         if (!$skipLogs) {
-            $migrations[] = new LogMigration();
+            $migrations[] = new LogMigration($pluginDataMigrator);
         }
 
         if (!$skipArchives) {
-            $migrations[] = new ArchiveMigration();
+            $migrations[] = new ArchiveMigration($pluginDataMigrator);
         }
 
         return $migrations;

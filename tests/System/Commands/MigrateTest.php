@@ -61,6 +61,15 @@ Processed AnnotationsMigration at 2019-01-10 02:48:01
 Processing CustomDimensionMigration at 2019-01-10 02:48:01
 Found 3 custom dimensions at 2019-01-10 02:48:01
 Processed CustomDimensionMigration at 2019-01-10 02:48:01
+Processing PluginDataMigration at 2019-01-10 02:48:01
+The table tagmanager_container has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_container_release has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_container_version has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_tag has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_trigger has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+The table tagmanager_variable has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it at 2019-01-10 02:48:01
+Found 0 plugins with data to migrate at 2019-01-10 02:48:01
+Processed PluginDataMigration at 2019-01-10 02:48:01
 Processing CustomAlertsMigration at 2019-01-10 02:48:01
 Migrated 0 custom alerts at 2019-01-10 02:48:01
 Migrated 0 triggered custom alerts at 2019-01-10 02:48:01
@@ -278,7 +287,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $output = $this->applicationTester->getDisplay();
         $this->assertTrue(
             strpos($output, 'Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01') !== false
-            || strpos($output, 'Skipping table because it is a target table targetdb_archive_numeric_2013_01 and source prefix is: at 2019-01-10 02:48:01') !== false,
+            || strpos($output, 'Skipping table targetdb_archive_numeric_2013_01 because it is not a monthly archive table of the source at 2019-01-10 02:48:01') !== false,
             $output
         );
         $this->assertEquals('0', $result);

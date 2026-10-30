@@ -40,6 +40,7 @@ Optional parameters are:
  --skip-logs                                        Skip migration of logs (Raw tracking data)
  --skip-archives                                    Skip migration of archives (Report data)
  --dry-run                                          Enable debug mode where it does not insert anything.
+ --skip-plugin-data=FormAnalytics,Funnels          Skip the data of the listed plugins
  --disable-db-transactions                          Disable the usage of MySQL database transactions
 ```
 
@@ -64,8 +65,98 @@ Please note that the migration can take a while depending on the amount of data 
 
 No data from the original Matomo instance will be deleted, only new data will be added to the new Matomo instance.
 
-If CustomAlerts is active on the source instance, its alert definitions and triggered history for the selected website are also copied. Install CustomAlerts with the same database structure on the destination before migrating.
-An alert shared with other source websites is copied with a mapping only to the newly created destination website.
-Historical snapshots are preserved, including alerts that are no longer assigned to the selected website; those alerts remain unassigned on the destination. Alert owners and notification settings are copied as stored, so ensure the owners exist and have access to the destination website, and configure the corresponding notification integrations there.
+Archive tables and their ID sequences are prepared before site data is copied, so creating a missing archive month
+does not commit an in-progress migration. With database transactions enabled and transactional destination tables,
+copying errors roll back the copied data. Empty archive tables and reserved sequence values from preparation can
+remain after a failure. A dry run does not create these tables or change their sequences.
 
-No premium feature data is currently being migrated.
+After a rolled-back failure, correct its cause and run the command again. Each successful run creates a new website;
+the command does not resume or deduplicate a partially committed migration. If transactions were disabled, inspect
+and remove the incomplete destination website before retrying.
+
+### Custom alerts
+
+If CustomAlerts is active on the source, the selected website's alert definitions and triggered history are copied.
+Install CustomAlerts with matching tables on the destination. Shared alerts are assigned only to the new destination
+website; definitions needed only by historical snapshots are copied without assigning them to the website.
+
+Alerts are migrated after premium plugin configuration. Report references and custom-metric IDs in each definition
+and historical snapshot are translated independently, preserving the report used when the alert fired. If a known
+reference cannot be translated because its data is missing or its plugin is excluded, the migration stops with an
+explanation. With database transactions enabled, changes are rolled back. A dry run also reports unresolved references.
+Alert owners and notification settings are retained; ensure the owners exist and have access to the destination
+website and configure its notification integrations.
+
+### Premium plugin data
+
+The migration copies the selected website's plugin configuration and raw data for the plugins listed below.
+Install and activate the same plugin versions on both instances before migrating. Only plugins activated and loaded
+on the source are considered, and the destination tables must have matching columns.
+
+| Plugin | Data copied |
+| --- | --- |
+| Heatmaps & Session Recordings | Configured heatmaps and recordings, recorded pageviews, events and shared content |
+| Funnels | Funnels, their steps, and the steps recorded for visits |
+| Form Analytics | Forms and visit interactions with forms, pages and fields |
+| Multi Channel Conversion Attribution | Goal attribution settings |
+| A/B Testing | Experiments, variations, strategies and visit assignments |
+| Media Analytics | Media and playback interactions |
+| Crash Analytics | Crashes, groups, visit events and stack traces |
+| Advertising Conversion Export | Export settings and advertising click IDs |
+| SEO Web Vitals | Stored PageSpeed audits |
+| Custom Reports | Site reports, applicable shared reports and their custom metrics |
+| Search Engine Keywords Performance | Imported Google, Bing and Yandex property data |
+| Roll-Up Reporting | Relationships between migrated sites and roll-ups |
+
+IDs in the copied plugin rows, segments and archived reports are translated to the destination IDs. Site-local goal
+and custom-dimension IDs remain unchanged because the command creates a new destination website. Shared rows are
+copied when referenced, and unrelated websites' data is excluded. Reports that reference plugin records excluded
+from migration are omitted instead of pointing to unrelated records on the destination.
+
+Use `--skip-plugin-data=FormAnalytics,Funnels` to exclude the named plugins. `--skip-logs` also excludes plugin visit
+logs and imported search-console data; `--skip-archives` excludes archived reports. `--dry-run` validates the
+migration without writing data. Unknown ID-like columns cause validation to fail before copying. Plugin schema changes
+may require updated migration definitions. The output identifies site tables without a migration definition.
+
+Some plugins require additional destination configuration:
+
+* Advertising Conversion Export URLs must point to the destination. Copied access tokens require the same
+  `[AdvertisingConversionExport]` salt; otherwise regenerate them on the destination.
+* Custom Reports for all or several websites are copied as reports of the migrated website. A site-specific report
+  takes precedence over a shared report with the same name. Existing custom metrics with matching names and formulas
+  are reused; conflicting names receive a numbered suffix and are shortened if needed to fit the destination column.
+  A metric referencing another source website stops migration if that website's ID matches the new destination ID:
+  preserving that formula would change its result. Review the metric's site-specific references before retrying.
+* Search-console accounts are instance settings and must be configured on the destination. The copied Bing site
+  settings require the same `[SearchEngineKeywordsPerformance]` encryption key, or Bing must be configured again.
+  Unreadable encrypted properties on the source stop the migration with an error instead of silently omitting their
+  historical data. Restore the source encryption configuration or explicitly exclude the plugin's data.
+  Imported rows already present for the same property and day are preserved.
+* Roll-ups regain relationships as their member sites are migrated, in either order. Unmigrated members are reported.
+  An all-websites roll-up aggregates the destination's websites. Follow the printed archive-invalidation command
+  when membership changes require reports to be rebuilt. Source database endpoint, database name and table prefix
+  distinguish site mappings; use the same source connection settings when migrating related sites.
+  Cloned sources sharing both a salt and identical connection settings cannot be distinguished. Configure distinct,
+  stable database endpoints when consolidating those sources.
+
+Users Flow and Cohorts use the archived reports already copied by the migration. This change does not copy global
+authentication settings, user accounts, notification integrations or scheduled email reports. Activity Log is not
+migrated: it is an instance-wide audit history with user and object references, rather than data owned by one website.
+
+Plugins can describe additional tables through the `Migration.addPluginDefinitions` event. See
+`PluginData/PluginDefinitions.php` and the included definitions for the extension API.
+
+### Testing
+
+From a configured Matomo test installation, run:
+
+```
+vendor/bin/phpunit -c tests/PHPUnit/phpunit.xml.dist plugins/Migration/tests
+```
+
+The synthetic plugin-data tests run without premium packages. `PremiumDefinitionsTest` also exercises the built-in
+transforms and report-ID rewrites without a database or licensed plugins, so this coverage runs in CI.
+`MigratePremiumPluginsTest` additionally creates
+and compares real data through the installed premium plugins; it skips when none are installed. To require all
+12 supported premium plugins in a licensed test installation, set `MIGRATION_REQUIRE_PREMIUM_PLUGINS=1` when
+running the suite. Premium packages and license keys must not be included in this repository.

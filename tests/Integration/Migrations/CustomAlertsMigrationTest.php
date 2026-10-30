@@ -18,8 +18,13 @@ use Piwik\Plugins\CustomDimensions\Dao\Configuration;
 use Piwik\Plugins\Goals\API as GoalsAPI;
 use Piwik\Plugins\Migration\Migrations;
 use Piwik\Plugins\Migration\Migrations\CustomAlertsMigration;
+use Piwik\Plugins\Migration\Migrations\PluginDataMigration;
 use Piwik\Plugins\Migration\Migrations\Provider;
 use Piwik\Plugins\Migration\Migrations\Request;
+use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
+use Piwik\Plugins\Migration\PluginData\PluginDefinition;
+use Piwik\Plugins\Migration\PluginData\PluginDefinitions;
+use Piwik\Plugins\Migration\PluginData\TableDefinition;
 use Piwik\Plugins\Migration\TargetDb;
 use Piwik\Tests\Framework\Fixture;
 use Piwik\Tests\Framework\TestCase\IntegrationTestCase;
@@ -37,6 +42,9 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
     /** @var Request */
     private $request;
 
+    /** @var string[] */
+    private $extraTables = [];
+
     public function setUp(): void
     {
         parent::setUp();
@@ -53,6 +61,9 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
+        foreach ($this->extraTables as $table) {
+            Db::query('DROP TABLE IF EXISTS ' . Db::get()->quoteIdentifier([$table]));
+        }
         foreach (['alert', 'alert_site', 'alert_triggered'] as $table) {
             Db::query('DROP TABLE IF EXISTS ' . $this->targetDb->prefixTable($table));
         }
@@ -65,6 +76,7 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
         $classes = array_map('get_class', (new Provider())->getAllMigrations($skipLogs, $skipArchives));
         $this->assertContains(CustomAlertsMigration::class, $classes);
         $this->assertGreaterThan(array_search(Migrations\SiteMigration::class, $classes), array_search(CustomAlertsMigration::class, $classes));
+        $this->assertGreaterThan(array_search(PluginDataMigration::class, $classes), array_search(CustomAlertsMigration::class, $classes));
     }
 
     public function getSkipOptions()
@@ -238,6 +250,132 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
     public function test_validateStructureAcceptsMatchingTables()
     {
         $this->assertSame([], (new CustomAlertsMigration())->validateStructure($this->targetDb));
+    }
+
+    public function test_translatesPremiumReportsAndMetricsInCurrentAlertsAndHistoricalSnapshots()
+    {
+        $migrator = $this->createPremiumReports();
+        $this->createPremiumAlert(1, [1]);
+        $this->createPremiumAlert(2, []); // its only connection to the site is a historical snapshot
+        $this->createPremiumAlert(3, [2], 2);
+        $this->targetDb->insert('alert', $this->alertRow(100, 'Existing destination alert'));
+        $sourceBefore = $this->allRows(false);
+        $this->request->idMaps->set('custom_metrics', 3, 203);
+        $this->request->idMaps->set('custom_metrics', 4, 204);
+
+        $this->migrateWithPremiumData($migrator);
+
+        $target = $this->allRows(true);
+        $this->assertCount(3, $target['alert']);
+        $this->assertCount(1, $target['alert_site']);
+        $this->assertCount(2, $target['alert_triggered']);
+        $this->assertSame('Goals_get_idGoal--1', $target['alert'][0]['report']);
+        foreach ([1, 2] as $offset) {
+            $this->assertSame('CustomReports_getCustomReport_idCustomReport--101', $target['alert'][$offset]['report']);
+            $this->assertSame('custom_metric_203', $target['alert'][$offset]['metric']);
+            $expectedHistory = $sourceBefore['alert_triggered'][$offset - 1];
+            $expectedHistory['idsite'] = '10';
+            $expectedHistory['idalert'] = (string) (100 + $offset);
+            $expectedHistory['report'] = 'CustomReports_getCustomReport_idCustomReport--102';
+            $expectedHistory['metric'] = 'custom_metric_204';
+            unset($expectedHistory['idtriggered']);
+            $actualHistory = $target['alert_triggered'][$offset - 1];
+            unset($actualHistory['idtriggered']);
+            $this->assertEquals($expectedHistory, $actualHistory);
+        }
+        $this->assertSame($sourceBefore, $this->allRows(false));
+        $this->assertSame([], $migrator->getTablesNotMigrated(1, $this->targetDb));
+    }
+
+    /** @dataProvider getUnresolvedPremiumReferences */
+    public function test_unresolvedPremiumReferencesRollBackTheCombinedMigration($table, $column, $value, $skipPlugin)
+    {
+        $migrator = $this->createPremiumReports($skipPlugin);
+        $this->createPremiumAlert(1, [1]);
+        $this->request->idMaps->set('custom_metrics', 3, 203);
+        $this->request->idMaps->set('custom_metrics', 4, 204);
+        if ($value !== null) {
+            Db::get()->update(Common::prefixTable($table), [$column => $value], 'idalert = 1');
+        }
+        $sourceBefore = $this->allRows(false);
+        try {
+            $this->migrateWithPremiumData($migrator);
+            $this->fail('Unresolved premium references must not be copied as source IDs.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('could not be migrated', $e->getMessage());
+            $this->assertStringContainsString($column, $e->getMessage());
+        }
+        $this->assertSame(['alert' => [], 'alert_site' => [], 'alert_triggered' => []], $this->allRows(true));
+        $this->assertSame(1, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM alerts_target_mtest_alert_report'));
+        $this->assertSame($sourceBefore, $this->allRows(false));
+    }
+
+    public function getUnresolvedPremiumReferences()
+    {
+        return [
+            'missing current report' => ['alert', 'report', 'CustomReports_getCustomReport_idCustomReport--999', false],
+            'missing historical report' => ['alert_triggered', 'report', 'CustomReports_getCustomReport_idCustomReport--999', false],
+            'missing current metric' => ['alert', 'metric', 'custom_metric_999', false],
+            'missing historical metric' => ['alert_triggered', 'metric', 'custom_metric_999', false],
+            'excluded plugin' => ['alert', 'report', null, true],
+        ];
+    }
+
+    public function test_dryRunResolvesPremiumReferencesWithoutWriting()
+    {
+        $migrator = $this->createPremiumReports();
+        $this->createPremiumAlert(1, [1]);
+        $this->request->idMaps->set('custom_metrics', 3, 203);
+        $this->request->idMaps->set('custom_metrics', 4, 204);
+        $sourceBefore = $this->allRows(false);
+        $this->targetDb->enableDryRun();
+
+        $this->migrateWithPremiumData($migrator);
+
+        $this->assertNotNull($this->request->idMaps->get('mtest_alert_report', 7));
+        $this->assertSame(['alert' => [], 'alert_site' => [], 'alert_triggered' => []], $this->allRows(true));
+        $this->assertSame(1, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM alerts_target_mtest_alert_report'));
+        $this->assertSame($sourceBefore, $this->allRows(false));
+    }
+
+    private function createPremiumReports(bool $skipPlugin = false): PluginDataMigrator
+    {
+        $table = 'mtest_alert_report';
+        foreach ([Common::prefixTable($table), $this->targetDb->prefixTable($table)] as $name) {
+            Db::query('CREATE TABLE ' . Db::get()->quoteIdentifier([$name]) . ' (idreport INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, idsite INT UNSIGNED, name VARCHAR(100)) ENGINE=InnoDB');
+            $this->extraTables[] = $name;
+        }
+        foreach ([[7, 1, 'Current report'], [9, 1, 'Historical report'], [99, 2, 'Other site report']] as $row) {
+            Db::get()->insert(Common::prefixTable($table), array_combine(['idreport', 'idsite', 'name'], $row));
+        }
+        $this->targetDb->insert($table, ['idreport' => 100, 'idsite' => 77, 'name' => 'Existing destination report']);
+        $definition = new PluginDefinition('Migration');
+        $definition->addTable(TableDefinition::forSite($table)->autoIncrement('idreport')->identifiedBy('name'));
+        $definition->identifiesReportsBy('idCustomReport', $table);
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        $this->request->idMaps->set('site', 1, 10);
+        return new PluginDataMigrator($definitions, $skipPlugin ? ['Migration'] : []);
+    }
+
+    private function createPremiumAlert(int $id, array $sites, int $historySite = 1): void
+    {
+        $this->createAlert($id, $sites, 'Premium alert ' . $id);
+        Db::get()->update(Common::prefixTable('alert'), [
+            'report' => 'CustomReports_getCustomReport_idCustomReport--7', 'metric' => 'custom_metric_3',
+        ], 'idalert = ' . $id);
+        $this->createHistory($id, $historySite);
+        Db::get()->update(Common::prefixTable('alert_triggered'), [
+            'report' => 'CustomReports_getCustomReport_idCustomReport--9', 'metric' => 'custom_metric_4',
+        ], 'idalert = ' . $id);
+    }
+
+    private function migrateWithPremiumData(PluginDataMigrator $migrator): void
+    {
+        (new Migrations())->migrate([
+            new PluginDataMigration($migrator, true),
+            new CustomAlertsMigration($migrator),
+        ], $this->request, $this->targetDb);
     }
 
     private function createAlert($id, $sites, $name = 'Test alert')
