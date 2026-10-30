@@ -56,13 +56,12 @@ final class RollUpReporting
         self::rememberTargetSite($sourceIdSite, $targetIdSite, $targetDb);
         $rollUpTable = self::quoteSourceTable('site_rollup');
         $messages = [];
-        $hasUnscopedMapping = false;
 
         // the roll-ups of the source the site belongs to, the ones not migrated yet get the site when they are
         $rollUpsWithSite = [];
         $rollUpsNotMigrated = [];
         foreach (Db::fetchAll("SELECT parent_idsite FROM $rollUpTable WHERE idsite = ? ORDER BY parent_idsite", [$sourceIdSite]) as $row) {
-            $idRollUp = self::getTargetSite((int) $row['parent_idsite'], $targetDb, $hasUnscopedMapping);
+            $idRollUp = self::getTargetSite((int) $row['parent_idsite'], $targetDb);
             if ($idRollUp === null || !self::isRollUp($idRollUp, $targetDb)) {
                 $rollUpsNotMigrated[] = (int) $row['parent_idsite'];
             } elseif (self::addSiteToRollUp($targetIdSite, $idRollUp, $targetDb)) {
@@ -93,7 +92,7 @@ final class RollUpReporting
             // the sites of the roll-up, the ones not migrated yet are added when they are
             $sitesNotMigrated = [];
             foreach (Db::fetchAll("SELECT idsite FROM $rollUpTable WHERE parent_idsite = ? ORDER BY idsite", [$sourceIdSite]) as $row) {
-                $idSite = self::getTargetSite((int) $row['idsite'], $targetDb, $hasUnscopedMapping);
+                $idSite = self::getTargetSite((int) $row['idsite'], $targetDb);
                 if ($idSite === null) {
                     $sitesNotMigrated[] = (int) $row['idsite'];
                 } else {
@@ -120,10 +119,6 @@ final class RollUpReporting
                 implode(', ', $affectedRollUps),
                 self::getInvalidationCommand($affectedRollUps, $request)
             );
-        }
-        if ($hasUnscopedMapping) {
-            $messages[] = 'Note: Earlier roll-up site mappings do not identify the source database and table prefix and cannot be reused safely. '
-                . 'Reconfigure those roll-up memberships on the target Matomo after verifying the source and target site IDs.';
         }
         return $messages;
     }
@@ -269,28 +264,31 @@ final class RollUpReporting
     /**
      * @return int|null the existing target site a site of the source was migrated to
      */
-    private static function getTargetSite(int $sourceIdSite, TargetDb $targetDb, bool &$hasUnscopedMapping): ?int
+    private static function getTargetSite(int $sourceIdSite, TargetDb $targetDb): ?int
     {
         $idSite = $targetDb->fetchOne('SELECT option_value FROM ' . $targetDb->quoteTable('option') . ' WHERE option_name = ?', [self::getMigratedSiteOption($sourceIdSite)]);
         if (!is_numeric($idSite) || !$targetDb->fetchOne('SELECT 1 FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$idSite])) {
-            // The old salt-only key may belong to another database or prefix. Never use it as a fallback.
-            $legacyOption = self::MIGRATED_SITE_OPTION . substr(hash('sha256', 'Migration' . SettingsPiwik::getSalt()), 0, 16) . '_' . $sourceIdSite;
-            $legacyId = $targetDb->fetchOne('SELECT option_value FROM ' . $targetDb->quoteTable('option') . ' WHERE option_name = ?', [$legacyOption]);
-            if (is_numeric($legacyId) && $targetDb->fetchOne('SELECT 1 FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$legacyId])) {
-                $hasUnscopedMapping = true;
-            }
             return null;
         }
         return (int) $idSite;
     }
 
     /**
-     * A source can have several Matomo databases or table prefixes sharing a salt, especially in WordPress multisite.
-     * Version the key because the old salt-only mappings cannot tell those sources apart.
+     * Cloned installations can share a salt, database name and prefix on different database endpoints.
      */
     private static function getMigratedSiteOption(int $sourceIdSite): string
     {
-        $source = serialize([SettingsPiwik::getSalt(), Db::fetchOne('SELECT DATABASE()'), Common::prefixTable('')]);
+        /** @var \Zend_Db_Adapter_Abstract $db Migration uses the connected source adapter. */
+        $db = Db::get();
+        $config = $db->getConfig();
+        $source = serialize([
+            SettingsPiwik::getSalt(),
+            (string) ($config['host'] ?? ''),
+            (int) ($config['port'] ?? 0) ?: 3306,
+            (string) ($config['unix_socket'] ?? ''),
+            Db::fetchOne('SELECT DATABASE()'),
+            Common::prefixTable(''),
+        ]);
         return self::MIGRATED_SITE_OPTION . 'v2_' . substr(hash('sha256', $source), 0, 32) . '_' . $sourceIdSite;
     }
 

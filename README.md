@@ -65,6 +65,15 @@ Please note that the migration can take a while depending on the amount of data 
 
 No data from the original Matomo instance will be deleted, only new data will be added to the new Matomo instance.
 
+Archive tables and their ID sequences are prepared before site data is copied, so creating a missing archive month
+does not commit an in-progress migration. With database transactions enabled and transactional destination tables,
+copying errors roll back the copied data. Empty archive tables and reserved sequence values from preparation can
+remain after a failure. A dry run does not create these tables or change their sequences.
+
+After a rolled-back failure, correct its cause and run the command again. Each successful run creates a new website;
+the command does not resume or deduplicate a partially committed migration. If transactions were disabled, inspect
+and remove the incomplete destination website before retrying.
+
 ### Custom alerts
 
 If CustomAlerts is active on the source, the selected website's alert definitions and triggered history are copied.
@@ -106,8 +115,8 @@ from migration are omitted instead of pointing to unrelated records on the desti
 
 Use `--skip-plugin-data=FormAnalytics,Funnels` to exclude the named plugins. `--skip-logs` also excludes plugin visit
 logs and imported search-console data; `--skip-archives` excludes archived reports. `--dry-run` validates the
-migration without writing data. Unknown ID-like columns cause validation to fail before copying, so a plugin schema
-change cannot silently leave references untranslated. The output identifies site tables without a migration definition.
+migration without writing data. Unknown ID-like columns cause validation to fail before copying. Plugin schema changes
+may require updated migration definitions. The output identifies site tables without a migration definition.
 
 Some plugins require additional destination configuration:
 
@@ -115,13 +124,20 @@ Some plugins require additional destination configuration:
   `[AdvertisingConversionExport]` salt; otherwise regenerate them on the destination.
 * Custom Reports for all or several websites are copied as reports of the migrated website. A site-specific report
   takes precedence over a shared report with the same name. Existing custom metrics with matching names and formulas
-  are reused; conflicting names receive a numbered suffix.
+  are reused; conflicting names receive a numbered suffix and are shortened if needed to fit the destination column.
+  A metric referencing another source website stops migration if that website's ID matches the new destination ID:
+  preserving that formula would change its result. Review the metric's site-specific references before retrying.
 * Search-console accounts are instance settings and must be configured on the destination. The copied Bing site
   settings require the same `[SearchEngineKeywordsPerformance]` encryption key, or Bing must be configured again.
+  Unreadable encrypted properties on the source stop the migration with an error instead of silently omitting their
+  historical data. Restore the source encryption configuration or explicitly exclude the plugin's data.
   Imported rows already present for the same property and day are preserved.
 * Roll-ups regain relationships as their member sites are migrated, in either order. Unmigrated members are reported.
   An all-websites roll-up aggregates the destination's websites. Follow the printed archive-invalidation command
-  when membership changes require reports to be rebuilt. Source database and table prefix distinguish site mappings.
+  when membership changes require reports to be rebuilt. Source database endpoint, database name and table prefix
+  distinguish site mappings; use the same source connection settings when migrating related sites.
+  Cloned sources sharing both a salt and identical connection settings cannot be distinguished. Configure distinct,
+  stable database endpoints when consolidating those sources.
 
 Users Flow and Cohorts use the archived reports already copied by the migration. This change does not copy global
 authentication settings, user accounts, notification integrations or scheduled email reports. Activity Log is not
@@ -138,7 +154,9 @@ From a configured Matomo test installation, run:
 vendor/bin/phpunit -c tests/PHPUnit/phpunit.xml.dist plugins/Migration/tests
 ```
 
-The synthetic plugin-data tests run without premium packages. `MigratePremiumPluginsTest` additionally creates
+The synthetic plugin-data tests run without premium packages. `PremiumDefinitionsTest` also exercises the built-in
+transforms and report-ID rewrites without a database or licensed plugins, so this coverage runs in CI.
+`MigratePremiumPluginsTest` additionally creates
 and compares real data through the installed premium plugins; it skips when none are installed. To require all
 12 supported premium plugins in a licensed test installation, set `MIGRATION_REQUIRE_PREMIUM_PLUGINS=1` when
 running the suite. Premium packages and license keys must not be included in this repository.

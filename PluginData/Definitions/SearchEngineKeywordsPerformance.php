@@ -67,7 +67,12 @@ final class SearchEngineKeywordsPerformance
         }
         $value = self::decrypt($value, self::ENCRYPTION_CLASS);
         if ($value === null) {
-            return [];
+            throw new \RuntimeException(sprintf(
+                'Cannot decrypt the SearchEngineKeywordsPerformance setting "%s" for site %d. Restore the source plugin encryption configuration, '
+                . 'or explicitly exclude its data with --skip-plugin-data=SearchEngineKeywordsPerformance.',
+                $setting,
+                $idSite
+            ));
         }
         $parts = explode('##', $value, 2);
         return isset($parts[1]) && $parts[1] !== '' ? [$parts[1]] : [];
@@ -85,10 +90,10 @@ final class SearchEngineKeywordsPerformance
         if (!class_exists($encryptionClass)) {
             return null;
         }
-        $decrypt = [new $encryptionClass(), 'decryptString'];
         try {
+            $decrypt = [new $encryptionClass(), 'decryptString'];
             $decrypted = is_callable($decrypt) ? $decrypt($value) : null;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return null;
         }
         return is_string($decrypted) ? $decrypted : null;

@@ -33,6 +33,9 @@ class Migrations
      */
     public function migrate($migrations, Request $request, TargetDb $targetDb)
     {
+        foreach ($migrations as $migration) {
+            $migration->prepare($targetDb);
+        }
         $targetDb->beginTransaction();
 
         try {
@@ -41,7 +44,7 @@ class Migrations
                 $migration->migrate($request, $targetDb);
                 $this->log('Processed ' . $migration->getName());
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             /**
              * Since php8, PDO::inTransaction() now reports the actual transaction state of the connection, rather than
              * an approximation maintained by PDO. If a query that is subject to "implicit commit" is executed,

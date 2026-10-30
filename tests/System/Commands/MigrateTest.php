@@ -287,7 +287,7 @@ Processed ArchiveMigration at 2019-01-10 02:48:01
         $output = $this->applicationTester->getDisplay();
         $this->assertTrue(
             strpos($output, 'Migrated archive table archive_numeric_2013_01 at 2019-01-10 02:48:01') !== false
-            || strpos($output, 'Skipping table because it is a target table targetdb_archive_numeric_2013_01 and source prefix is: at 2019-01-10 02:48:01') !== false,
+            || strpos($output, 'Skipping table targetdb_archive_numeric_2013_01 because it is not a monthly archive table of the source at 2019-01-10 02:48:01') !== false,
             $output
         );
         $this->assertEquals('0', $result);

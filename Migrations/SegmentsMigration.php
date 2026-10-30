@@ -50,7 +50,7 @@ class SegmentsMigration extends BaseMigration
         // These copies are compared with target segments once every plugin ID has been translated.
         if (!self::hasPluginDataIds($segment['definition'], $pluginSegmentTables)) {
             $existingId = $targetDb->fetchOne(
-                'SELECT idsegment FROM `' . $targetDb->prefixTable('segment') . '` WHERE enable_only_idsite IN (' . implode(',', array_map('intval', $sitesToReuse)) . ')'
+                'SELECT idsegment FROM ' . $targetDb->quoteTable('segment') . ' WHERE enable_only_idsite IN (' . implode(',', array_map('intval', $sitesToReuse)) . ')'
                 . ' AND `definition` = ? AND deleted = ? ORDER BY enable_only_idsite DESC, idsegment LIMIT 1',
                 array($segment['definition'], $segment['deleted'])
             );

@@ -130,9 +130,18 @@ final class CustomReports
         if (!is_string($formula)) {
             return $formula;
         }
-        return preg_replace_callback('/\{\{site([1-9][0-9]*)_([a-zA-Z0-9_]+)\}\}/', function (array $matches) use ($resolver) {
+        return preg_replace_callback('/\{\{site([1-9][0-9]*)_([a-zA-Z0-9_]+)\}\}/', function (array $matches) use ($resolver, $row) {
             $idSite = $resolver->resolve(TableDefinition::SITE, $matches[1]);
             if ($idSite === null) {
+                if ($resolver->isTargetSiteId($matches[1])) {
+                    $metricId = $row['idcustommetric'] ?? null;
+                    throw new \RuntimeException(sprintf(
+                        'Cannot migrate custom metric %s: its formula references unrelated source website %s, which has the same ID as the destination website. '
+                        . 'Keeping the formula would change its result. Review its site-specific references or explicitly exclude CustomReports with --skip-plugin-data=CustomReports before retrying.',
+                        is_scalar($metricId) ? $metricId : '(unknown)',
+                        $matches[1]
+                    ));
+                }
                 return $matches[0]; // the metric of another site, which has no value for the reports of the site
             }
             return '{{site' . $idSite . '_' . self::pointMetricToTargetIds($matches[2], $resolver) . '}}';

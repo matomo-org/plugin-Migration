@@ -42,7 +42,7 @@ class PluginDataMigration extends BaseMigration
         $errors = $this->migrator->validate($targetDb, $this->withVisitData);
 
         foreach ($this->migrator->getTablesToMigrate($this->withVisitData) as $table) {
-            if ($targetDb->doesTableExist($targetDb->prefixTable($table))) {
+            if ($this->migrator->doesSourceTableExist($table) && $targetDb->doesTableExist($targetDb->prefixTable($table))) {
                 $errors = array_merge($errors, $this->checkTablesHaveSameStructure($targetDb, $table));
             }
         }
@@ -52,8 +52,13 @@ class PluginDataMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb): void
     {
+        $skippedTables = $this->migrator->getSkippedTablePlugins();
         foreach ($this->migrator->getTablesNotMigrated($request->sourceIdSite, $targetDb) as $table) {
-            $this->log(sprintf('The table %s has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it', $table));
+            if (isset($skippedTables[$table])) {
+                $this->log(sprintf('The table %s has data of this site that is not migrated, as plugin %s was excluded with --skip-plugin-data', $table, $skippedTables[$table]));
+            } else {
+                $this->log(sprintf('The table %s has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it', $table));
+            }
         }
 
         $pluginNames = array_map(function ($definition) {
@@ -84,7 +89,7 @@ class PluginDataMigration extends BaseMigration
             foreach ($definition->getTables() as $tableDefinition) {
                 // the data stored per key of the site is migrated later, with the visits
                 $hasData = $hasData || !empty($countsPerTable[$tableDefinition->getTable()]['migrated'])
-                    || !empty($tableDefinition->getSiteKeys($request->sourceIdSite));
+                    || ($this->withVisitData && !empty($tableDefinition->getSiteKeys($request->sourceIdSite)));
             }
             if ($hasData) {
                 foreach ($definition->getNotes() as $note) {

@@ -46,6 +46,16 @@ final class IdResolver
         $this->targetDb = $targetDb;
     }
 
+    /**
+     * Whether an ID identifies one of the sites copied on the destination.
+     *
+     * @param int|string $idSite
+     */
+    public function isTargetSiteId($idSite): bool
+    {
+        return in_array((string) $idSite, array_map('strval', $this->maps->getAll(TableDefinition::SITE)), true);
+    }
+
     public function getTargetDb(): TargetDb
     {
         return $this->targetDb;

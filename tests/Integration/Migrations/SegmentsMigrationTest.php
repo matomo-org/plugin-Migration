@@ -13,6 +13,7 @@ use Piwik\Common;
 use Piwik\Db;
 use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\Migrations\SegmentsMigration;
+use Piwik\Plugins\Migration\PluginData\IdMaps;
 use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
 use Piwik\Plugins\Migration\PluginData\PluginDefinition;
 use Piwik\Plugins\Migration\PluginData\PluginDefinitions;
@@ -70,6 +71,27 @@ class SegmentsMigrationTest extends IntegrationTestCase
         }
         Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . 'segment`');
         parent::tearDown();
+    }
+
+    public function test_copyToSite_quotesTargetPrefixWhenReusingSegments(): void
+    {
+        $targetDb = new TargetDb(['tables_prefix' => 'segment_quoted`_']);
+        $targetTable = $targetDb->quoteTable('segment');
+        Db::query('CREATE TABLE ' . $targetTable . ' LIKE ' . $this->targetDb->quoteTable('segment'));
+        try {
+            $existing = $this->segment(500, 2, 'Existing target segment', 'visitCount==3');
+            $targetDb->insert('segment', $existing);
+            $source = $this->segment(100, 1, 'Source segment', 'visitCount==3');
+
+            [$id, $copied] = SegmentsMigration::copyToSite($source, 2, new IdMaps(), $targetDb, [0, 2]);
+
+            $this->assertEquals(500, $id);
+            $this->assertFalse($copied);
+            $this->assertSame(1, (int) $targetDb->fetchOne('SELECT COUNT(*) FROM ' . $targetTable));
+            $this->assertSame(0, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM ' . $this->targetDb->quoteTable('segment')));
+        } finally {
+            Db::query('DROP TABLE ' . $targetTable);
+        }
     }
 
     /**

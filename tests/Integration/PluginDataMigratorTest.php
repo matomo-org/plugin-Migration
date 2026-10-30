@@ -11,6 +11,7 @@ namespace Piwik\Plugins\Migration\tests\Integration;
 
 use Piwik\Common;
 use Piwik\Db;
+use Piwik\Plugins\Migration\Migrations\PluginDataMigration;
 use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
 use Piwik\Plugins\Migration\PluginData\PluginDefinition;
@@ -81,6 +82,89 @@ class PluginDataMigratorTest extends IntegrationTestCase
         $definition->addTable(TableDefinition::forSiteKeys('mtest_import', 'property', 'date', [$this, 'getSiteKeys']));
 
         $this->assertEquals([], $this->validate($definition));
+    }
+
+    /**
+     * @dataProvider getTableKinds
+     */
+    public function test_validateStructure_reportsMissingSourceTable(bool $siteStep): void
+    {
+        $definition = new PluginDefinition(self::PLUGIN_NAME);
+        if ($siteStep) {
+            $definition->migratesSiteWith(function () {
+                return [];
+            }, 'mtest_item');
+        } else {
+            $definition->addTable(TableDefinition::forSite('mtest_item')->autoIncrement('iditem')->identifiedBy('name'));
+        }
+        $definition->addTable(TableDefinition::forSiteKeys('mtest_import', 'property', 'date', [$this, 'getSiteKeys']));
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        Db::query('DROP TABLE ' . Common::prefixTable('mtest_item'));
+        Db::query('ALTER TABLE ' . self::TARGET_PREFIX . 'mtest_import ADD extra_column INT NULL');
+
+        $migration = new PluginDataMigration(new PluginDataMigrator($definitions), true);
+        $this->assertSame([
+            'The table "' . Common::prefixTable('mtest_item') . '" of plugin Migration does not exist in the source DB. Please make sure the plugin is installed correctly.',
+            'The following columns are missing in the source DB table "' . Common::prefixTable('mtest_import') . '": extra_column',
+        ], $migration->validateStructure($this->targetDb));
+    }
+
+    /**
+     * @dataProvider getTableKinds
+     */
+    public function test_migrate_distinguishesSkippedAndUnknownTables(bool $siteStep): void
+    {
+        $definition = new PluginDefinition(self::PLUGIN_NAME);
+        if ($siteStep) {
+            $definition->migratesSiteWith(function () {
+                return [];
+            }, 'mtest_item');
+        } else {
+            $definition->addTable(TableDefinition::forSite('mtest_item')->autoIncrement('iditem')->identifiedBy('name'));
+        }
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        Db::get()->insert(Common::prefixTable('mtest_item'), ['idsite' => 1, 'name' => 'Skipped item']);
+        Db::query('ALTER TABLE ' . Common::prefixTable('mtest_item_part') . ' ADD idsite INT NOT NULL');
+        Db::get()->insert(Common::prefixTable('mtest_item_part'), ['idsite' => 1, 'iditem' => 1, 'name' => 'Unknown item']);
+        $migration = new PluginDataMigration(new PluginDataMigrator($definitions, [self::PLUGIN_NAME]), true);
+        $messages = [];
+        $migration->onLog(function ($message) use (&$messages) {
+            $messages[] = $message;
+        });
+        $request = new Request();
+        $request->sourceIdSite = 1;
+        $request->targetIdSite = 2;
+
+        $migration->migrate($request, $this->targetDb);
+
+        $this->assertContains('The table ' . Common::prefixTable('mtest_item') . ' has data of this site that is not migrated, as plugin Migration was excluded with --skip-plugin-data', $messages);
+        $this->assertContains('The table ' . Common::prefixTable('mtest_item_part') . ' has data of this site that is not migrated, as no plugin data definition of an activated plugin describes it', $messages);
+        $this->assertSame(0, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM ' . self::TARGET_PREFIX . 'mtest_item'));
+    }
+
+    public function getTableKinds(): array
+    {
+        return ['table definition' => [false], 'site step' => [true]];
+    }
+
+    public function test_skipLogsDoesNotReadSourcePropertyKeys(): void
+    {
+        $definition = new PluginDefinition(self::PLUGIN_NAME);
+        $definition->addTable(TableDefinition::forSiteKeys('mtest_import', 'property', 'date', function () {
+            throw new \RuntimeException('Raw property data was excluded');
+        }));
+        $definition->addNote('Imported property data');
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        $migration = new PluginDataMigration(new PluginDataMigrator($definitions), false);
+        $request = new Request();
+        $request->sourceIdSite = 1;
+        $request->targetIdSite = 2;
+        $this->assertSame([], $migration->validateStructure($this->targetDb));
+        $migration->migrate($request, $this->targetDb);
+        $this->assertSame(0, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM ' . self::TARGET_PREFIX . 'mtest_import'));
     }
 
     public function test_validate_refusesTheFeaturesWhereTheyAreNotSupported()
@@ -192,6 +276,60 @@ class PluginDataMigratorTest extends IntegrationTestCase
             'paginated parent' => [false, 1001],
             'site link table' => [true, 2],
         ];
+    }
+
+    /**
+     * @dataProvider getUniqueNamesAtColumnLimit
+     */
+    public function test_copySharedRowKeepsCollisionSuffixWithinColumnWidth(string $character): void
+    {
+        // Mirrors the real CustomReports name constraint, including the unique index.
+        $source = Db::get()->quoteIdentifier([Common::prefixTable('mtest_shared')]);
+        $target = $this->targetDb->quoteTable('mtest_shared');
+        foreach ([$source, $target] as $table) {
+            Db::query("ALTER TABLE $table ADD UNIQUE unique_name (`name`)");
+        }
+        $name = str_repeat($character, 50);
+        $occupiedSuffix = str_repeat($character, 46) . ' (2)';
+        $expectedName = str_repeat($character, 46) . ' (3)';
+        Db::query("INSERT INTO $source (idshared, hash, name) VALUES (?, ?, ?)", [7, 111, $name]);
+        Db::query("INSERT INTO $target (idshared, hash, name) VALUES (?, ?, ?)", [20, 222, $name]);
+        Db::query("INSERT INTO $target (idshared, hash, name) VALUES (?, ?, ?)", [21, 333, $occupiedSuffix]);
+
+        $tableDefinition = TableDefinition::shared('mtest_shared', 'idshared', ['hash', 'name'])->keepsUnique('name');
+        $definition = new PluginDefinition(self::PLUGIN_NAME);
+        $definition->addTable($tableDefinition);
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        $targetId = null;
+        // A separate migration must reuse the matching suffixed row, not create another metric.
+        for ($migration = 0; $migration < 2; $migration++) {
+            $migrator = new PluginDataMigrator($definitions);
+            $this->assertSame([], $migrator->validate($this->targetDb, true));
+            $resolver = new \Piwik\Plugins\Migration\PluginData\IdResolver(
+                new \Piwik\Plugins\Migration\PluginData\IdMaps(),
+                $migrator,
+                new \Piwik\Plugins\Migration\Migrations\LogActionMigration(),
+                $this->targetDb
+            );
+            $copiedId = $migrator->copySharedRow($tableDefinition, 7, $resolver, $this->targetDb);
+            if ($targetId !== null) {
+                $this->assertSame((int) $targetId, (int) $copiedId);
+            }
+            $targetId = $copiedId;
+        }
+
+        $this->assertSame($expectedName, $this->targetDb->fetchOne("SELECT name FROM $target WHERE idshared = ?", [$targetId]));
+        $this->assertSame(50, (int) $this->targetDb->fetchOne("SELECT CHAR_LENGTH(name) FROM $target WHERE idshared = ?", [$targetId]));
+        $this->assertSame(3, (int) $this->targetDb->fetchOne("SELECT COUNT(*) FROM $target"));
+        $this->assertSame($name, $this->targetDb->fetchOne("SELECT name FROM $target WHERE idshared = ?", [20]));
+        $this->assertSame($occupiedSuffix, $this->targetDb->fetchOne("SELECT name FROM $target WHERE idshared = ?", [21]));
+        $this->assertSame($name, Db::fetchOne("SELECT name FROM $source WHERE idshared = ?", [7]));
+    }
+
+    public function getUniqueNamesAtColumnLimit(): array
+    {
+        return ['ASCII' => ['x'], 'multibyte UTF-8' => ["\u{00E9}"]];
     }
 
     /**

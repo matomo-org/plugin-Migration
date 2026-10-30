@@ -1148,12 +1148,26 @@ class PluginDataMigrator
         $targetId = null;
         $uniqueColumn = $tableDefinition->getUniqueValueColumn();
         $uniqueValue = $uniqueColumn !== null ? $targetRow[$uniqueColumn] : null;
+        $uniqueColumnType = null;
         for ($attempt = 1; $targetId === null && !empty($tableDefinition->getMatchColumns()); $attempt++) {
             if ($uniqueColumn !== null && $attempt > 1) {
                 if ($attempt > 100) {
                     throw new \Exception(sprintf('Could not find a free value for the column %s of the table %s on the target', $uniqueColumn, $table));
                 }
-                $targetRow[$uniqueColumn] = sprintf('%s (%d)', is_scalar($uniqueValue) ? $uniqueValue : '', $attempt);
+                $suffix = sprintf(' (%d)', $attempt);
+                $base = is_scalar($uniqueValue) ? (string) $uniqueValue : '';
+                if ($uniqueColumnType === null) {
+                    $targetColumns = $targetDb->getTableColumns($targetDb->prefixTable($table));
+                    $uniqueColumnType = $targetColumns[$uniqueColumn]['Type'] ?? '';
+                }
+                if (is_string($uniqueColumnType) && preg_match('/^(?:var)?char\((\d+)\)/i', $uniqueColumnType, $matches)) {
+                    $availableLength = (int) $matches[1] - mb_strlen($suffix, 'UTF-8');
+                    if ($availableLength < 0) {
+                        throw new \RuntimeException(sprintf('The column %s of the table %s is too short for a unique value suffix', $uniqueColumn, $table));
+                    }
+                    $base = mb_substr($base, 0, $availableLength, 'UTF-8');
+                }
+                $targetRow[$uniqueColumn] = $base . $suffix;
             }
             $targetId = $this->findMatchingSharedRow($tableDefinition, $targetRow, $targetDb);
             if ($uniqueColumn === null || !$this->isValueTaken($table, $uniqueColumn, $targetRow[$uniqueColumn], $targetDb)) {
@@ -1367,6 +1381,27 @@ class PluginDataMigrator
     }
 
     /**
+     * @return array<string, string> prefixed table name => explicitly skipped plugin
+     */
+    public function getSkippedTablePlugins(): array
+    {
+        $tables = [];
+        foreach ($this->definitions->getAll() as $definition) {
+            $pluginName = $definition->getPluginName();
+            if (!in_array($pluginName, $this->skippedPlugins, true)) {
+                continue;
+            }
+            foreach ($definition->getTables() as $tableDefinition) {
+                $tables[Common::prefixTable($tableDefinition->getTable())] = $pluginName;
+            }
+            foreach ($definition->getSiteStepTables() as $table) {
+                $tables[Common::prefixTable($table)] = $pluginName;
+            }
+        }
+        return $tables;
+    }
+
+    /**
      * The source tables that have rows of the site but are not migrated, because no plugin definition describes them
      * or because their plugin is skipped. Tables of core are not reported, these are migrated or not site specific.
      *
@@ -1533,7 +1568,7 @@ class PluginDataMigrator
         return $this->quoteIdentifier(Common::prefixTable($table));
     }
 
-    private function doesSourceTableExist(string $table): bool
+    public function doesSourceTableExist(string $table): bool
     {
         return (bool) Db::fetchOne('SHOW TABLES LIKE ?', [addcslashes(Common::prefixTable($table), '\\_%')]);
     }

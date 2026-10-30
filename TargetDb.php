@@ -109,7 +109,6 @@ class TargetDb
 
     public function createArchiveTableIfNeeded($table)
     {
-        $sourceDbTableName = Common::prefixTable($table);
         $targetDbTableName = $this->prefixTable($table);
 
         if (!$this->doesTableExist($targetDbTableName)) {
@@ -118,15 +117,18 @@ class TargetDb
                 $type = 'archive_blob';
             }
             $createTableSql = DbHelper::getTableCreateSql($type);
-            $createTableSql = str_replace($type, $table, $createTableSql);
-            $createTableSql = str_replace($sourceDbTableName, $targetDbTableName, $createTableSql);
+            $createTableSql = str_replace(
+                'CREATE TABLE ' . Common::prefixTable($type),
+                'CREATE TABLE ' . $this->quoteTable($table),
+                $createTableSql
+            );
 
             if (!$this->dryRun) {
                 $this->db->query($createTableSql);
             }
         }
 
-        $numericTableName = str_replace('archive_blob', 'archive_numeric', $targetDbTableName);
+        $numericTableName = $this->prefixTable(str_replace('archive_blob', 'archive_numeric', $table));
 
         if (!$this->dryRun) {
             // need to make sure the correct sequence entry exists otherwise there may be random issues where it never gets created properly
@@ -143,7 +145,7 @@ class TargetDb
                 if (!$this->dryRun) {
                     $sequenceTable = $this->quoteTable(Sequence::TABLE_NAME);
                     // we also do +1 if the value is already high just to be safe...
-                    $this->db->query("UPDATE $sequenceTable SET `value` = if(`value` < ?, ?, `value` + 1) WHERE `name` = ?", [$val, $val, $targetDbTableName]);
+                    $this->db->query("UPDATE $sequenceTable SET `value` = if(`value` < ?, ?, `value` + 1) WHERE `name` = ?", [$val, $val, $numericTableName]);
                 }
             }
         }

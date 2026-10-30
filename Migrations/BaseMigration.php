@@ -32,6 +32,14 @@ abstract class BaseMigration
 
     abstract public function migrate(Request $request, TargetDb $targetDb);
 
+    /**
+     * Prepares schema before the runner starts the transaction that copies site data.
+     * Creating tables inside that transaction would implicitly commit earlier writes.
+     */
+    public function prepare(TargetDb $targetDb): void
+    {
+    }
+
     protected function migrateEntities(Request $request, TargetDb $targetDb, $tableUnprefixed, $entityName, $unsetId = null, $idSiteColumnName = 'idsite')
     {
         $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable($tableUnprefixed) . ' WHERE ' . $idSiteColumnName . ' = ?', array($request->sourceIdSite));

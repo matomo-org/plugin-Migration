@@ -16,7 +16,6 @@ use Piwik\Option;
 use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\PluginData\Definitions\RollUpReporting;
 use Piwik\Plugins\Migration\TargetDb;
-use Piwik\SettingsPiwik;
 use Piwik\Site;
 use Piwik\Tests\Framework\Fixture;
 use Piwik\Tests\Framework\TestCase\IntegrationTestCase;
@@ -136,26 +135,22 @@ class RollUpReportingTest extends IntegrationTestCase
         $this->assertSame(0, $this->targetSettings($targetA)['sitesearch']);
     }
 
-    public function test_legacyMappingsAreNotReusedAndCanBeReestablishedExplicitly(): void
+    public function test_existingTargetSiteIsLinkedOnlyAfterItsMigrationIsRecorded(): void
     {
         $sourceSite = $this->createSourceSite('Previously migrated website');
         $sourceRollUp = $this->createSourceSite('Roll-up', false, 'rollup');
         $this->addSourceMembership($sourceRollUp, $sourceSite);
         $targetSite = $this->copySite($sourceSite);
-        $legacyName = 'MigrationSourceSite_' . substr(hash('sha256', 'Migration' . SettingsPiwik::getSalt()), 0, 16) . '_' . $sourceSite;
-        $this->targetDb->insert('option', ['option_name' => $legacyName, 'option_value' => $targetSite, 'autoload' => 0]);
 
         [$targetRollUp, $messages] = $this->migrateRollUpStep($sourceRollUp);
 
         $this->assertSame([], $this->targetMembers($targetRollUp));
-        $this->assertStringContainsString('cannot be reused safely', implode("\n", $messages));
-        $this->assertStringContainsString('Reconfigure those roll-up memberships', implode("\n", $messages));
-        $this->assertStringContainsString('after verifying the source and target site IDs', implode("\n", $messages));
+        $this->assertStringContainsString('not migrated yet', implode("\n", $messages));
 
         $this->migrateRollUpStep($sourceSite, $targetSite);
         [, $messages] = $this->migrateRollUpStep($sourceRollUp, $targetRollUp);
         $this->assertSame([$targetSite], $this->targetMembers($targetRollUp));
-        $this->assertStringNotContainsString('cannot be reused safely', implode("\n", $messages));
+        $this->assertStringNotContainsString('not migrated yet', implode("\n", $messages));
         $this->assertSame(2, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM ' . self::TARGET_PREFIX . 'site'));
     }
 
@@ -208,6 +203,45 @@ class RollUpReportingTest extends IntegrationTestCase
             }
             $this->targetDb = $originalTarget;
         }
+    }
+
+    /**
+     * @dataProvider getIndependentEndpoints
+     */
+    public function test_sameNamedDatabasesOnDifferentEndpointsKeepMappingsSeparate(array $otherEndpoint): void
+    {
+        $sourceSite = $this->createSourceSite('Shared source ID');
+        $sourceRollUp = $this->createSourceSite('Source A roll-up', false, 'rollup');
+        $this->addSourceMembership($sourceRollUp, $sourceSite);
+
+        // Keep the fixture connection open and simulate endpoint metadata only. This exercises
+        // real mapping writes/membership reads without requiring a second database server.
+        $adapter = Db::get();
+        $configProperty = new \ReflectionProperty(\Zend_Db_Adapter_Abstract::class, '_config');
+        $originalConfig = $configProperty->getValue($adapter);
+        $sourceA = array_replace($originalConfig, ['host' => 'source-a.example.test', 'port' => 3306, 'unix_socket' => '']);
+        try {
+            $configProperty->setValue($adapter, $sourceA);
+            [$targetA] = $this->migrateRollUpStep($sourceSite);
+            $configProperty->setValue($adapter, array_replace($sourceA, $otherEndpoint));
+            [$targetB] = $this->migrateRollUpStep($sourceSite);
+            $configProperty->setValue($adapter, $sourceA);
+            [$targetRollUp] = $this->migrateRollUpStep($sourceRollUp);
+
+            $this->assertNotSame($targetA, $targetB);
+            $this->assertSame([$targetA], $this->targetMembers($targetRollUp));
+        } finally {
+            $configProperty->setValue($adapter, $originalConfig);
+        }
+    }
+
+    public function getIndependentEndpoints(): array
+    {
+        return [
+            'host' => [['host' => 'source-b.example.test']],
+            'port' => [['port' => 3307]],
+            'socket' => [['unix_socket' => '/run/mysql/source-b.sock']],
+        ];
     }
 
     private function switchToOtherSource(string $sourceKind): void
