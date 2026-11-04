@@ -185,6 +185,12 @@ Processed LogMigration at 2019-01-10 02:48:01
             return '5-2b6';
         }
 
+        // The traffic ratio was added during 6.1.0-alpha (matomo-org/matomo#25544).
+        // Check its availability so earlier checkouts with that same version still use the old reports.
+        if ($api === ['API.get'] && class_exists(\Piwik\Plugins\BotTracking\Columns\Metrics\AIChatbotTrafficRatio::class)) {
+            return 'bot-traffic-ratio';
+        }
+
         // The folder-level pageUrl segment only included URL aliases as of 5.12.0-alpha
         // (matomo-org/matomo#24598). Older core still produces a single-clause segment.
         if ($api === ['Actions.getPageUrls'] && version_compare(Version::VERSION, '5.12.0-alpha', '<')) {
