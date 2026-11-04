@@ -13,6 +13,9 @@ use Piwik\Access;
 use Piwik\Common;
 use Piwik\DataTable\Row;
 use Piwik\Db;
+use Piwik\Plugins\Migration\Migrations\SegmentsMigration;
+use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
+use Piwik\Plugins\Migration\PluginData\PluginDefinitions;
 use Piwik\Plugins\Migration\tests\Fixtures\MigrationFixture;
 use Piwik\Plugins\Migration\tests\Fixtures\PremiumPluginsFixture;
 use Piwik\Tests\Framework\Mock\FakeAccess;
@@ -168,7 +171,28 @@ class MigratePremiumPluginsTest extends ConsoleCommandTestCase
     public function test_runMigration_skipPluginData_doesNotMigrateTheirData()
     {
         $plugins = $this->getPremiumPlugins();
-        $result = $this->runCommand(['--skip-plugin-data' => implode(',', $plugins)]);
+        $segmentTables = (new PluginDataMigrator(PluginDefinitions::collect()))->getSegmentTables();
+        $segments = array_filter(Db::fetchAll('SELECT * FROM segment WHERE enable_only_idsite = 1'), function ($segment) use ($segmentTables) {
+            return SegmentsMigration::hasPluginDataIds($segment['definition'], $segmentTables);
+        });
+        $options = ['--skip-plugin-data' => implode(',', $plugins)];
+        if ($segments) {
+            $before = $this->getMaxTargetIdSite();
+            $this->assertSame(1, $this->runCommand($options));
+            $this->assertStringContainsString('missing or excluded plugin data', $this->applicationTester->getDisplay());
+            $this->assertSame($before, $this->getMaxTargetIdSite(), 'The rejected migration must roll back its new site.');
+        }
+        // Exclusion is valid after removing segment references to the excluded plugins.
+        try {
+            foreach ($segments as $segment) {
+                Db::get()->update('segment', ['definition' => 'visitCount==1', 'hash' => md5('visitCount==1')], 'idsegment = ' . (int) $segment['idsegment']);
+            }
+            $result = $this->runCommand($options);
+        } finally {
+            foreach ($segments as $segment) {
+                Db::get()->update('segment', ['definition' => $segment['definition'], 'hash' => $segment['hash']], 'idsegment = ' . (int) $segment['idsegment']);
+            }
+        }
         $output = $this->applicationTester->getDisplay();
         $this->assertEquals(0, $result, $output);
         $idSite = $this->getMaxTargetIdSite();

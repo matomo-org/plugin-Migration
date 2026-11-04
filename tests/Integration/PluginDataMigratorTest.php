@@ -11,6 +11,7 @@ namespace Piwik\Plugins\Migration\tests\Integration;
 
 use Piwik\Common;
 use Piwik\Db;
+use Piwik\Plugins\Migration\Migrations\LogActionMigration;
 use Piwik\Plugins\Migration\Migrations\PluginDataMigration;
 use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
@@ -165,6 +166,73 @@ class PluginDataMigratorTest extends IntegrationTestCase
         $this->assertSame([], $migration->validateStructure($this->targetDb));
         $migration->migrate($request, $this->targetDb);
         $this->assertSame(0, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM ' . self::TARGET_PREFIX . 'mtest_import'));
+    }
+
+    /** @dataProvider getSiteLogCases */
+    public function test_siteLogUsesDeclaredAutoIncrementIndex(bool $primaryKey, bool $dryRun): void
+    {
+        $table = 'mtest_site_log';
+        $source = Common::prefixTable($table);
+        $target = $this->targetDb->prefixTable($table);
+        $index = $primaryKey ? 'PRIMARY KEY (idrow)' : 'UNIQUE KEY row_sequence (idrow)';
+        $schema = "(idrow INT UNSIGNED NOT NULL AUTO_INCREMENT, idsite INT UNSIGNED NOT NULL, iditem INT UNSIGNED NOT NULL, server_time DATETIME NOT NULL, value INT NOT NULL, $index) ENGINE=InnoDB";
+        Db::query("CREATE TABLE $source $schema");
+        Db::query("CREATE TABLE $target $schema");
+        try {
+            // More than one page, gaps in the sequence, another site, and a missing referenced item.
+            $values = [];
+            $bind = [];
+            for ($i = 1; $i <= 1001; ++$i) {
+                $values[] = '(?, 1, 7, ?, ?)';
+                array_push($bind, $i * 2, '2013-01-01 01:00:00', $i);
+            }
+            Db::query("INSERT INTO $source (idrow, idsite, iditem, server_time, value) VALUES " . implode(', ', $values), $bind);
+            Db::query("INSERT INTO $source VALUES (2003, 99, 7, '2013-01-01 01:00:00', -1), (2004, 1, 999, '2013-01-01 01:00:00', -2)");
+            Db::query("INSERT INTO $target VALUES (5000, 99, 79, '2013-01-01 01:00:00', -3)");
+            Db::get()->insert(Common::prefixTable('mtest_item'), ['iditem' => 7, 'idsite' => 1, 'name' => 'Mapped item']);
+            $this->targetDb->insert('mtest_item', ['iditem' => 79, 'idsite' => 99, 'name' => 'Unrelated target item']);
+            $definition = new PluginDefinition(self::PLUGIN_NAME);
+            $definition->addTable(TableDefinition::forSite('mtest_item')->autoIncrement('iditem'));
+            $definition->addTable(TableDefinition::forSiteLog($table, 'server_time')->autoIncrement('idrow')->references('iditem', 'mtest_item'));
+            $definitions = new PluginDefinitions();
+            $definitions->add($definition);
+            $migrator = new PluginDataMigrator($definitions);
+            $this->assertSame([], $migrator->validate($this->targetDb, true));
+            $request = new Request();
+            $request->sourceIdSite = 1;
+            $request->targetIdSite = 2;
+            $request->idMaps->set(TableDefinition::SITE, 1, 2);
+            $sourceBefore = Db::fetchAll("SELECT * FROM $source ORDER BY idrow");
+            $targetBefore = Db::fetchAll("SELECT * FROM $target ORDER BY idrow");
+            if ($dryRun) {
+                $this->targetDb->enableDryRun();
+            }
+            $migrator->migrateSiteData($request, $this->targetDb);
+
+            $counts = $migrator->migrateSiteLogData($request, $this->targetDb, new LogActionMigration());
+
+            $this->assertSame(['migrated' => 1001, 'skipped' => 1, 'existing' => 0, 'duplicate' => 0, 'present' => 0], $counts[$table]);
+            $this->assertSame([], $request->idMaps->getAll($table), 'Raw row IDs must not accumulate across batches.');
+            if ($dryRun) {
+                $this->assertSame($targetBefore, Db::fetchAll("SELECT * FROM $target ORDER BY idrow"));
+            } else {
+                $rows = Db::fetchAll("SELECT * FROM $target WHERE idsite = 2 ORDER BY idrow");
+                $this->assertCount(1001, $rows);
+                $this->assertEquals(range(1, 1001), array_column($rows, 'value'));
+                $this->assertEquals([80], array_values(array_unique(array_column($rows, 'iditem'))));
+                $this->assertGreaterThan(5000, (int) $rows[0]['idrow']);
+                $this->assertSame($targetBefore, Db::fetchAll("SELECT * FROM $target WHERE idsite = 99 ORDER BY idrow"));
+            }
+            $this->assertSame($sourceBefore, Db::fetchAll("SELECT * FROM $source ORDER BY idrow"));
+        } finally {
+            Db::query("DROP TABLE $source");
+            Db::query("DROP TABLE $target");
+        }
+    }
+
+    public static function getSiteLogCases(): array
+    {
+        return ['primary key' => [true, false], 'unique index' => [false, false], 'primary dry run' => [true, true], 'unique dry run' => [false, true]];
     }
 
     public function test_validate_refusesTheFeaturesWhereTheyAreNotSupported()

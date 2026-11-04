@@ -69,6 +69,16 @@ class PremiumDefinitionsTest extends TestCase
         $this->assertSame($expected, $transform($source, $row, $this->resolver));
     }
 
+    public function test_customReportFilterRejectsSkippedFunnel(): void
+    {
+        $migrator = new PluginDataMigrator($this->definitions, ['Funnels']);
+        $resolver = new IdResolver($this->maps, $migrator, $this->createMock(LogActionMigration::class), $this->targetDb);
+        $transform = $this->getTransform('CustomReports', 'custom_reports', 'segment_filter');
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('funnels_name==79');
+        $transform('funnels_name==79', [], $resolver);
+    }
+
     public static function getTransformCases(): array
     {
         return [

@@ -118,12 +118,17 @@ logs and imported search-console data; `--skip-archives` excludes archived repor
 migration without writing data. Unknown ID-like columns cause validation to fail before copying. Plugin schema changes
 may require updated migration definitions. The output identifies site tables without a migration definition.
 
+If a copied segment or a custom-report filter references known plugin data that is missing or excluded, migration
+stops with an explanation instead of retaining a source ID that could select unrelated destination data. Dry runs
+check these references too. Correct the reference or include the required plugin data before retrying.
+
 Some plugins require additional destination configuration:
 
 * Advertising Conversion Export URLs must point to the destination. Copied access tokens require the same
   `[AdvertisingConversionExport]` salt; otherwise regenerate them on the destination.
 * Custom Reports for all or several websites are copied as reports of the migrated website. A site-specific report
-  takes precedence over a shared report with the same name. Existing custom metrics with matching names and formulas
+  takes precedence over a shared report with the same name; alert references use the retained report, while the
+  duplicate's archives are omitted. Existing custom metrics with matching names and formulas
   are reused; conflicting names receive a numbered suffix and are shortened if needed to fit the destination column.
   A metric referencing another source website stops migration if that website's ID matches the new destination ID:
   preserving that formula would change its result. Review the metric's site-specific references before retrying.

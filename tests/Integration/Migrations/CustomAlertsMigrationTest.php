@@ -338,6 +338,47 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
         $this->assertSame($sourceBefore, $this->allRows(false));
     }
 
+    /** @dataProvider getDuplicateReportModes */
+    public function test_deduplicatedReportsResolveInAlertsAndHistory(bool $dryRun): void
+    {
+        $migrator = $this->createPremiumReports();
+        foreach ([[77, 'Current report'], [78, 'Historical report']] as [$id, $name]) {
+            Db::get()->insert(Common::prefixTable('mtest_alert_report'), ['idreport' => $id, 'idsite' => 0, 'name' => $name]);
+        }
+        $this->createAlert(1, [1]);
+        Db::get()->update(Common::prefixTable('alert'), ['report' => 'CustomReports_getCustomReport_idCustomReport--77', 'metric' => 'nb_visits'], 'idalert = 1');
+        $this->createHistory(1, 1);
+        Db::get()->update(Common::prefixTable('alert_triggered'), ['report' => 'CustomReports_getCustomReport_idCustomReport--78', 'metric' => 'nb_visits'], 'idalert = 1');
+        $sourceBefore = $this->allRows(false);
+        if ($dryRun) {
+            $this->targetDb->enableDryRun();
+        }
+
+        $this->migrateWithPremiumData($migrator);
+
+        $this->assertNotNull($this->request->idMaps->get('mtest_alert_report', 77));
+        $this->assertNotNull($this->request->idMaps->get('mtest_alert_report', 78));
+        $target = $this->allRows(true);
+        if ($dryRun) {
+            $this->assertSame(['alert' => [], 'alert_site' => [], 'alert_triggered' => []], $target);
+            $this->assertSame(1, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM alerts_target_mtest_alert_report'));
+        } else {
+            $this->assertEquals($this->request->idMaps->get('mtest_alert_report', 7), $this->request->idMaps->get('mtest_alert_report', 77));
+            $this->assertEquals($this->request->idMaps->get('mtest_alert_report', 9), $this->request->idMaps->get('mtest_alert_report', 78));
+            $this->assertSame('CustomReports_getCustomReport_idCustomReport--101', $target['alert'][0]['report']);
+            $this->assertSame('CustomReports_getCustomReport_idCustomReport--102', $target['alert_triggered'][0]['report']);
+            $this->assertSame(3, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM alerts_target_mtest_alert_report'));
+            $this->assertSame('CustomReports_customreport_101_table', $migrator->getTargetArchiveRecordName('CustomReports_customreport_7_table', $this->request->idMaps));
+            $this->assertNull($migrator->getTargetArchiveRecordName('CustomReports_customreport_77_table', $this->request->idMaps), 'A deduplicated report must not replace the site report archive.');
+        }
+        $this->assertSame($sourceBefore, $this->allRows(false));
+    }
+
+    public static function getDuplicateReportModes(): array
+    {
+        return ['real migration' => [false], 'dry run' => [true]];
+    }
+
     private function createPremiumReports(bool $skipPlugin = false): PluginDataMigrator
     {
         $table = 'mtest_alert_report';
@@ -350,8 +391,9 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
         }
         $this->targetDb->insert($table, ['idreport' => 100, 'idsite' => 77, 'name' => 'Existing destination report']);
         $definition = new PluginDefinition('Migration');
-        $definition->addTable(TableDefinition::forSite($table)->autoIncrement('idreport')->identifiedBy('name'));
+        $definition->addTable(TableDefinition::forSite($table)->autoIncrement('idreport')->identifiedBy('name')->includesRowsOfSeveralSites('idsite = 0'));
         $definition->identifiesReportsBy('idCustomReport', $table);
+        $definition->renamesArchiveRecords('/^CustomReports_customreport_(\d+)(?=_)/', $table);
         $definitions = new PluginDefinitions();
         $definitions->add($definition);
         $this->request->idMaps->set('site', 1, 10);

@@ -66,6 +66,9 @@ class PluginDataMigrator
      */
     private $sharedRowIds = [];
 
+    /** @var array<string, array<int|string, true>> source rows replaced by a site-specific row */
+    private $deduplicatedRowIds = [];
+
     /**
      * @var array<string, array<string, array<string, mixed>>> table => column => definition as in SHOW COLUMNS
      */
@@ -224,6 +227,15 @@ class PluginDataMigrator
             return 0;
         }
 
+        // Validate source definitions even in a dry run, where the copied destination rows do not exist.
+        // Include on-demand global segments and references to skipped plugins.
+        foreach (array_keys($request->idMaps->getAll(TableDefinition::SEGMENT)) as $sourceId) {
+            $source = Db::fetchRow('SELECT definition FROM ' . $this->quoteSourceTable('segment') . ' WHERE idsegment = ?', [$sourceId]);
+            if (is_array($source) && is_string($source['definition'] ?? null)) {
+                SegmentsMigration::pointPluginDataToTargetIds($source['definition'], $request->idMaps, $segmentTables);
+            }
+        }
+
         // like SegmentsMigration and copySegmentOfAllWebsites() reuse segments
         $targetIdSite = (int) $request->targetIdSite;
         $copiedSegments = array_fill_keys($request->copiedSegmentIds, [$targetIdSite]);
@@ -307,7 +319,7 @@ class PluginDataMigrator
     }
 
     /**
-     * The segments selecting plugin data by ID of the plugins whose data is migrated, see
+     * The segments selecting plugin data by ID, including plugins whose data is excluded, see
      * PluginDefinition::identifiesSegmentsBy()
      *
      * @return array<string, string> segment => table
@@ -315,7 +327,7 @@ class PluginDataMigrator
     public function getSegmentTables(): array
     {
         $segmentTables = [];
-        foreach ($this->getDefinitionsToMigrate() as $definition) {
+        foreach ($this->definitions->getAll() as $definition) {
             $segmentTables = array_merge($segmentTables, $definition->getSegmentTables());
         }
         return $segmentTables;
@@ -760,6 +772,8 @@ class PluginDataMigrator
             $existing = $identityRow !== null ? $this->findExistingRow($tableDefinition, $identityRow, $targetDb) : null;
             if ($existing !== null && in_array((string) $this->toId($existing[$idColumn]), array_map('strval', $maps->getAll($table)), true)) {
                 // another row was copied to it, eg a row of the site with the same name
+                $maps->set($table, $this->toId($row[$idColumn]), $this->toId($existing[$idColumn]));
+                $this->deduplicatedRowIds[$table][$this->toId($row[$idColumn])] = true;
                 return 'duplicate';
             }
         }
@@ -824,8 +838,8 @@ class PluginDataMigrator
                 $counts[$table] = $tableCounts;
                 continue;
             }
-            // like the visits, the rows are read in the order of the primary key, see LogMigration
-            $sql = sprintf('SELECT * FROM %s FORCE INDEX (PRIMARY) WHERE %s > ? AND %s', $sourceTable, $this->quoteIdentifier($idColumn), $where)
+            // The declared auto-increment column is indexed, but need not be the primary key.
+            $sql = sprintf('SELECT * FROM %s WHERE %s > ? AND %s', $sourceTable, $this->quoteIdentifier($idColumn), $where)
                 . sprintf(' ORDER BY %s ASC LIMIT %d', $this->quoteIdentifier($idColumn), self::ROWS_PER_QUERY);
             $lastId = (int) $first - 1;
             do {
@@ -1228,6 +1242,10 @@ class PluginDataMigrator
                 }
 
                 [$sourceId, $offset] = $matches[1];
+                // References use the retained report, but its archives must not be replaced by the duplicate's.
+                if (isset($this->deduplicatedRowIds[$table][$sourceId])) {
+                    return null;
+                }
                 $targetId = $maps->get($table, $this->toId($sourceId));
                 if ($targetId === null) {
                     return null;

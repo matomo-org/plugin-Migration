@@ -11,6 +11,8 @@ namespace Piwik\Plugins\Migration\tests\Integration\Migrations;
 
 use Piwik\Common;
 use Piwik\Db;
+use Piwik\Plugins\Migration\Migrations;
+use Piwik\Plugins\Migration\Migrations\PluginDataMigration;
 use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\Migrations\SegmentsMigration;
 use Piwik\Plugins\Migration\PluginData\IdMaps;
@@ -141,6 +143,64 @@ class SegmentsMigrationTest extends IntegrationTestCase
             $this->reportDefinitions(),
             'The first translated definition must not merge with the second copy while it still contains its source ID.'
         );
+    }
+
+    /** @dataProvider getUnresolvedSegmentCases */
+    public function test_unresolvedPluginSegmentsFailWithoutChangingTarget(bool $skipPlugin, bool $dryRun, string $definition, bool $global): void
+    {
+        if ($skipPlugin) {
+            $this->insertSource('mtest_segment_item', ['iditem' => 79, 'idsite' => 1, 'name' => 'Skipped item']);
+        }
+        $this->targetDb->insert('mtest_segment_item', ['iditem' => 79, 'idsite' => 99, 'name' => 'Another site item']);
+        $this->targetDb->insert('segment', $this->segment(500, 2, 'Existing segment', $definition));
+        $this->insertSource('segment', $this->segment(100, $global ? 0 : 1, 'Source segment', $definition));
+        $definitions = $this->definitions;
+        if ($global) {
+            // Another migrated plugin can pull in a global segment even if this plugin is skipped.
+            $reports = new PluginDefinition('CoreHome');
+            $reports->addTable(TableDefinition::forSite('mtest_segment_report')->autoIncrement('idreport')->references('idsegment', TableDefinition::SEGMENT));
+            $definitions = new PluginDefinitions();
+            $items = new PluginDefinition('Migration');
+            $items->addTable(TableDefinition::forSite('mtest_segment_item')->autoIncrement('iditem'));
+            $items->identifiesSegmentsBy('mtestItem', 'mtest_segment_item');
+            $definitions->add($items);
+            $definitions->add($reports);
+            $this->insertSource('mtest_segment_report', ['idreport' => 10, 'idsite' => 1, 'idsegment' => 100, 'name' => 'Report with global segment']);
+        }
+        $sourceBefore = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('segment') . ' ORDER BY idsegment');
+        $targetBefore = $this->targetDb->getDb()->fetchAll('SELECT * FROM segment_target_segment ORDER BY idsegment');
+        if ($dryRun) {
+            $this->targetDb->enableDryRun();
+        }
+        $migrator = new PluginDataMigrator($definitions, $skipPlugin ? ['Migration'] : []);
+        $failure = null;
+        try {
+            (new Migrations())->migrate([new SegmentsMigration(), new PluginDataMigration($migrator, false)], $this->request(), $this->targetDb);
+        } catch (\RuntimeException $error) {
+            $failure = $error;
+        }
+        $this->assertNotNull($failure, 'A missing mapping must not keep a source ID that selects unrelated destination data.');
+        $this->assertStringContainsString('missing or excluded plugin data', $failure->getMessage());
+        $this->assertStringContainsString('mtestItem', $failure->getMessage());
+        $this->assertStringContainsString('79', $failure->getMessage());
+        $this->assertSame($targetBefore, $this->targetDb->getDb()->fetchAll('SELECT * FROM segment_target_segment ORDER BY idsegment'));
+        $this->assertSame($sourceBefore, Db::fetchAll('SELECT * FROM ' . Common::prefixTable('segment') . ' ORDER BY idsegment'));
+        $this->assertSame(0, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM segment_target_mtest_segment_report'));
+        $this->assertSame(1, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM segment_target_mtest_segment_item'));
+    }
+
+    public static function getUnresolvedSegmentCases(): array
+    {
+        return [
+            'skipped plugin' => [true, false, 'mtestItem==79', false],
+            'skipped plugin dry run' => [true, true, 'mtestItem==79', false],
+            'missing row' => [false, false, 'mtestItem!=79', false],
+            'missing row dry run' => [false, true, 'mtestItem!=79', false],
+            'encoded condition' => [true, false, 'visitCount>1;mtestItem%3D%3D79', false],
+            'encoded definition dry run' => [true, true, urlencode('visitCount>1;mtestItem==79'), false],
+            'global segment from another plugin' => [true, false, 'mtestItem==79', true],
+            'global segment dry run' => [true, true, 'mtestItem==79', true],
+        ];
     }
 
     public static function getSegmentScopes(): array

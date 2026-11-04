@@ -120,7 +120,18 @@ class MigratePluginDataTest extends ConsoleCommandTestCase
      */
     public function test_runMigration_skipPluginData_doesNotMigrateItsDataNorArchiveRecordsReferencingIt()
     {
-        $result = $this->runCommand(['--skip-plugin-data' => 'Migration']);
+        // Test archive exclusion without a segment that requires the excluded data.
+        $segments = Db::fetchAll("SELECT * FROM segment WHERE definition LIKE '%mtestHeatmap%'");
+        try {
+            foreach ($segments as $segment) {
+                Db::get()->update('segment', ['definition' => 'visitCount==1', 'hash' => md5('visitCount==1')], 'idsegment = ' . (int) $segment['idsegment']);
+            }
+            $result = $this->runCommand(['--skip-plugin-data' => 'Migration']);
+        } finally {
+            foreach ($segments as $segment) {
+                Db::get()->update('segment', ['definition' => $segment['definition'], 'hash' => $segment['hash']], 'idsegment = ' . (int) $segment['idsegment']);
+            }
+        }
         $output = $this->applicationTester->getDisplay();
         $this->assertEquals(0, $result, $output);
 
@@ -143,6 +154,23 @@ class MigratePluginDataTest extends ConsoleCommandTestCase
             ['MTest_heatmaps', -1, -1, 'integer', 21, null, []],
             ['MTest_heatmaps_chunk_0_99', 0, 'other', 'string', 1, null, []],
         ], $this->getHeatmapReportRows(self::TARGET_PREFIX, 3, [], []));
+    }
+
+    /** @dataProvider getSkippedSegmentModes */
+    public function test_runMigration_rejectsSegmentsOfSkippedPlugins(bool $dryRun): void
+    {
+        $before = $this->getTargetRowCounts();
+        $result = $this->runCommand(['--skip-plugin-data' => 'Migration', '--dry-run' => $dryRun]);
+
+        $this->assertSame(1, $result, $this->applicationTester->getDisplay());
+        $this->assertStringContainsString('missing or excluded plugin data', $this->applicationTester->getDisplay());
+        $this->assertStringContainsString('mtestHeatmap', $this->applicationTester->getDisplay());
+        $this->assertSame($before, $this->getTargetRowCounts());
+    }
+
+    public static function getSkippedSegmentModes(): array
+    {
+        return ['real migration' => [false], 'dry run' => [true]];
     }
 
     public function test_runMigration_failsForUnknownPluginToSkip()
@@ -425,7 +453,7 @@ class MigratePluginDataTest extends ConsoleCommandTestCase
     private function getTargetRowCounts(): array
     {
         $counts = [];
-        foreach (['site', 'mtest_heatmap', 'mtest_metric', 'mtest_report', 'mtest_import', 'mtest_site_flag', 'mtest_container', 'mtest_container_item', 'mtest_blob', 'log_mtest', 'log_mtest_heatmap', 'log_mtest_event'] as $table) {
+        foreach (['site', 'segment', 'mtest_heatmap', 'mtest_metric', 'mtest_report', 'mtest_import', 'mtest_site_flag', 'mtest_container', 'mtest_container_item', 'mtest_blob', 'log_mtest', 'log_mtest_heatmap', 'log_mtest_event'] as $table) {
             $counts[$table] = (int) $this->fetchOne("SELECT COUNT(*) FROM %s$table");
         }
         return $counts;

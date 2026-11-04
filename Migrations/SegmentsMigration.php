@@ -84,7 +84,7 @@ class SegmentsMigration extends BaseMigration
     /**
      * Changes the IDs of plugin data a segment definition selects to their IDs on the target, eg "funnels_name==3" to
      * "funnels_name==5", see PluginDefinition::identifiesSegmentsBy(). The definition is returned as it is if no ID
-     * changes.
+     * changes. A known plugin ID without a mapping fails instead of selecting unrelated destination data.
      *
      * @param array<string, string> $segmentTables segment => table of the rows it selects by ID
      */
@@ -95,7 +95,16 @@ class SegmentsMigration extends BaseMigration
                 if (!isset($segmentTables[$matches[1]])) {
                     return $matches[0];
                 }
-                return $matches[1] . $matches[2] . ($idMaps->get($segmentTables[$matches[1]], $matches[3]) ?? $matches[3]);
+                $targetId = $idMaps->get($segmentTables[$matches[1]], $matches[3]);
+                if ($targetId === null) {
+                    throw new \RuntimeException(sprintf(
+                        'Cannot migrate segment condition "%s": ID %s of %s references missing or excluded plugin data.',
+                        $matches[0],
+                        $matches[3],
+                        $segmentTables[$matches[1]]
+                    ));
+                }
+                return $matches[1] . $matches[2] . $targetId;
             }, $condition);
         });
     }
