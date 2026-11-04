@@ -75,6 +75,11 @@ class TargetDb
         return $this->db->fetchRow($sql, $bind, $fetchMode);
     }
 
+    public function fetchOne($sql, $bind = [])
+    {
+        return $this->db->fetchOne($sql, $bind);
+    }
+
     /**
      * @ignore tests only
      */
@@ -85,7 +90,7 @@ class TargetDb
 
     public function getTableColumns($tableName)
     {
-        $allColumns = $this->db->fetchAll("SHOW COLUMNS FROM `$tableName`");
+        $allColumns = $this->db->fetchAll('SHOW COLUMNS FROM ' . $this->quoteIdentifier($tableName));
 
         $fields = [];
         foreach ($allColumns as $column) {
@@ -97,14 +102,13 @@ class TargetDb
 
     public function doesTableExist($targetDbTableName)
     {
-        $foundTable = $this->db->fetchAll("SHOW TABLES LIKE '" . $targetDbTableName . "'");
+        $foundTable = $this->db->fetchAll('SHOW TABLES LIKE ?', [addcslashes($targetDbTableName, '\\_%')]);
 
         return !empty($foundTable);
     }
 
     public function createArchiveTableIfNeeded($table)
     {
-        $sourceDbTableName = Common::prefixTable($table);
         $targetDbTableName = $this->prefixTable($table);
 
         if (!$this->doesTableExist($targetDbTableName)) {
@@ -113,15 +117,18 @@ class TargetDb
                 $type = 'archive_blob';
             }
             $createTableSql = DbHelper::getTableCreateSql($type);
-            $createTableSql = str_replace($type, $table, $createTableSql);
-            $createTableSql = str_replace($sourceDbTableName, $targetDbTableName, $createTableSql);
+            $createTableSql = str_replace(
+                'CREATE TABLE ' . Common::prefixTable($type),
+                'CREATE TABLE ' . $this->quoteTable($table),
+                $createTableSql
+            );
 
             if (!$this->dryRun) {
                 $this->db->query($createTableSql);
             }
         }
 
-        $numericTableName = str_replace('archive_blob', 'archive_numeric', $targetDbTableName);
+        $numericTableName = $this->prefixTable(str_replace('archive_blob', 'archive_numeric', $table));
 
         if (!$this->dryRun) {
             // need to make sure the correct sequence entry exists otherwise there may be random issues where it never gets created properly
@@ -136,9 +143,9 @@ class TargetDb
                 $val = $val + 20; // +20 to allow other sequences to be created concurrently
 
                 if (!$this->dryRun) {
-                    $sequenceTable = $this->prefixTable(Sequence::TABLE_NAME);
+                    $sequenceTable = $this->quoteTable(Sequence::TABLE_NAME);
                     // we also do +1 if the value is already high just to be safe...
-                    $this->db->query("UPDATE `$sequenceTable` SET `value` = if(`value` < ?, ?, `value` + 1) WHERE `name` = ?", [$val, $val, $targetDbTableName]);
+                    $this->db->query("UPDATE $sequenceTable SET `value` = if(`value` < ?, ?, `value` + 1) WHERE `name` = ?", [$val, $val, $numericTableName]);
                 }
             }
         }
@@ -146,7 +153,7 @@ class TargetDb
 
     public function getMaxArchiveId($targetDbTableNamePrefixed)
     {
-        $val = $this->db->fetchOne("SELECT max(idarchive) FROM `$targetDbTableNamePrefixed`");
+        $val = $this->db->fetchOne('SELECT max(idarchive) FROM ' . $this->quoteIdentifier($targetDbTableNamePrefixed));
         if (empty($val)) {
             $val = 0;
         }
@@ -176,6 +183,46 @@ class TargetDb
         return $sequence->getNextId();
     }
 
+    public function fetchCol($sql, $bind = [])
+    {
+        return $this->db->fetchCol($sql, $bind);
+    }
+
+    /**
+     * @return array<array<string, mixed>>
+     */
+    public function fetchAll($sql, $bind = [])
+    {
+        return $this->db->fetchAll($sql, $bind);
+    }
+
+    /**
+     * @param array<string, int|string> $whereColumns
+     */
+    public function delete(string $table, array $whereColumns): void
+    {
+        if ($this->dryRun || empty($whereColumns)) {
+            return;
+        }
+
+        $where = [];
+        foreach (array_keys($whereColumns) as $column) {
+            $where[] = $this->quoteIdentifier($column) . ' = ?';
+        }
+        $this->db->query(sprintf('DELETE FROM %s WHERE %s', $this->quoteTable($table), implode(' AND ', $where)), array_values($whereColumns));
+    }
+
+    public function quoteTable(string $table): string
+    {
+        return $this->quoteIdentifier($this->prefixTable($table));
+    }
+
+    public function quoteIdentifier(string $identifier): string
+    {
+        // Each name is one identifier; dots must not become database/table qualifiers.
+        return $this->db->quoteIdentifier([$identifier]);
+    }
+
     public function prefixTable($table)
     {
         return $this->config['tables_prefix'] . $table;
@@ -183,12 +230,12 @@ class TargetDb
 
     public function insert($table, $row)
     {
-        $columns = implode('`,`', array_keys($row));
+        $columns = implode(',', array_map([$this, 'quoteIdentifier'], array_keys($row)));
         $fields = Common::getSqlStringFieldsArray($row);
 
-        $tablePrefixed = $this->prefixTable($table);
+        $tablePrefixed = $this->quoteTable($table);
 
-        $sql = sprintf('INSERT INTO `%s` (`%s`) VALUES(%s)', $tablePrefixed, $columns, $fields);
+        $sql = sprintf('INSERT INTO %s (%s) VALUES(%s)', $tablePrefixed, $columns, $fields);
         $bind = array_values($row);
 
         if ($this->dryRun) {
@@ -203,21 +250,25 @@ class TargetDb
 
     public function update($table, $columns, $whereColumns)
     {
+        if ($this->dryRun) {
+            return;
+        }
+
         if (!empty($columns)) {
             $fields = [];
             $bind = [];
             foreach ($columns as $key => $value) {
-                $fields[] = " `$key` = ?";
+                $fields[] = $this->quoteIdentifier($key) . ' = ?';
                 $bind[] = $value;
             }
             $fields = implode(',', $fields);
             $where = [];
             foreach ($whereColumns as $col => $val) {
-                $where[] = " `$col` = ?";
+                $where[] = $this->quoteIdentifier($col) . ' = ?';
                 $bind[] = $val;
             }
             $where = implode(' AND ', $where);
-            $query = sprintf('UPDATE `%s` SET %s WHERE %s', $this->prefixTable($table), $fields, $where);
+            $query = sprintf('UPDATE %s SET %s WHERE %s', $this->quoteTable($table), $fields, $where);
 
             $this->db->query($query, $bind);
         }
