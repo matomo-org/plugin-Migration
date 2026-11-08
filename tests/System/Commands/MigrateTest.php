@@ -322,6 +322,12 @@ The following columns are missing in the target DB table "targetdb_log_action": 
             'Live.getLastVisitsDetails',
         ];
 
+        $xmlFieldsToRemove = ['pageIdAction'];
+        // The AI chatbot traffic ratio metric was only added in 6.1.0-alpha (matomo-org/matomo#25544)
+        if (version_compare(Version::VERSION, '6.1.0-alpha', '<')) {
+            $xmlFieldsToRemove[] = 'BotTracking_AIChatbotsTrafficRatio';
+        }
+
         $apiToTest   = [];
         foreach ($apis as $api) {
             $testSuffix = '';
@@ -332,7 +338,7 @@ The following columns are missing in the target DB table "targetdb_log_action": 
                     'date' => self::$fixture->dateTime,
                     'periods' => ['day', 'year'],
                     'testSuffix' => $testSuffix,
-                    'xmlFieldsToRemove' => ['pageIdAction'],
+                    'xmlFieldsToRemove' => $xmlFieldsToRemove,
                 ],
             ];
         }
