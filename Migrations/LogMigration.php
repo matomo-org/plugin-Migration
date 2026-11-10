@@ -13,10 +13,21 @@ use Piwik\Common;
 use Piwik\Db;
 use Piwik\DbHelper;
 use Piwik\Plugins\Migration\Db\BatchQuery;
+use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
 use Piwik\Plugins\Migration\TargetDb;
 
 class LogMigration extends BaseMigration
 {
+    /**
+     * @var PluginDataMigrator|null
+     */
+    private $pluginDataMigrator;
+
+    public function __construct(?PluginDataMigrator $pluginDataMigrator = null)
+    {
+        $this->pluginDataMigrator = $pluginDataMigrator;
+    }
+
     public function validateStructure(TargetDb $targetDb)
     {
         $errors1 = $this->checkTablesHaveSameStructure($targetDb, 'log_visit');
@@ -39,11 +50,17 @@ class LogMigration extends BaseMigration
         $numVisits = (int) Db::fetchOne('SELECT count(*) FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ?', array($request->sourceIdSite));
         $this->log(sprintf('Found %s visits', $numVisits));
 
+        $logActionMigration = new LogActionMigration();
+        if ($this->pluginDataMigrator) {
+            foreach ($this->pluginDataMigrator->migrateSiteLogData($request, $targetDb, $logActionMigration) as $table => $counts) {
+                $this->logRowCounts($table, $counts);
+            }
+        }
+
         if (!$numVisits) {
             return;
         }
 
-        $logActionMigration = new LogActionMigration();
         $hasPageViewTimeTable = $this->hasPageViewTimeTable();
 
         $count = 0;
@@ -71,6 +88,12 @@ class LogMigration extends BaseMigration
             }
         }
         $this->log(sprintf('Migrated %s visits. The number of migrated visits may be higher if data is still tracked into the source Matomo while migrating the data', $count));
+
+        if ($this->pluginDataMigrator) {
+            foreach ($this->pluginDataMigrator->getVisitDataCounts() as $pluginTable => $counts) {
+                $this->logRowCounts($pluginTable, $counts);
+            }
+        }
     }
 
     private function migrateVisits($visitRows, Request $request, LogActionMigration $logActionMigration, TargetDb $targetDb, bool $hasPageViewTimeTable)
@@ -157,6 +180,10 @@ class LogMigration extends BaseMigration
                 }
             }
             unset($rows);
+        }
+
+        if ($this->pluginDataMigrator && $this->pluginDataMigrator->hasVisitData()) {
+            $this->pluginDataMigrator->migrateVisitData($request, $targetDb, $visitorIdMap, $visitorLinkActionMap, $logActionMigration);
         }
 
         foreach ($visitRows as $visitRow) {

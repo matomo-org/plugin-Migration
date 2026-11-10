@@ -9,6 +9,8 @@
 
 namespace Piwik\Plugins\Migration\Migrations;
 
+use Piwik\Plugins\Migration\PluginData\IdMaps;
+
 class Request
 {
     /**
@@ -20,4 +22,21 @@ class Request
      * @var int
      */
     public $targetIdSite;
+
+    /**
+     * The target ID of each migrated row, for the tables other rows may reference
+     *
+     * @var IdMaps
+     */
+    public $idMaps;
+
+    /**
+     * @var array<int|string> target IDs of copied segments whose plugin references are translated afterwards
+     */
+    public $copiedSegmentIds = [];
+
+    public function __construct()
+    {
+        $this->idMaps = new IdMaps();
+    }
 }

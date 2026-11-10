@@ -12,44 +12,80 @@ namespace Piwik\Plugins\Migration\Migrations;
 use Piwik\Common;
 use Piwik\DataAccess\ArchiveTableCreator;
 use Piwik\Plugins\Migration\Db\BatchQuery;
+use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
 use Piwik\Plugins\Migration\TargetDb;
 
 class ArchiveMigration extends BaseMigration
 {
     private $idArchiveMap = array();
 
+    /**
+     * @var string[]|null source snapshot, taken before destination archive tables are created
+     */
+    private $archiveTables;
+
+    /**
+     * @var PluginDataMigrator|null
+     */
+    private $pluginDataMigrator;
+
+    public function __construct(?PluginDataMigrator $pluginDataMigrator = null)
+    {
+        $this->pluginDataMigrator = $pluginDataMigrator;
+    }
+
     public function validateStructure(TargetDb $targetDb)
     {
         return array();
     }
 
+    public function prepare(TargetDb $targetDb): void
+    {
+        $this->idArchiveMap = [];
+        $this->archiveTables = array_unique(ArchiveTableCreator::getTablesArchivesInstalled());
+        $sourcePrefix = Common::prefixTable('');
+        foreach ($this->archiveTables as $archiveTable) {
+            if ($this->isSourceArchiveTable($archiveTable, $sourcePrefix)) {
+                $targetDb->createArchiveTableIfNeeded(substr($archiveTable, strlen($sourcePrefix)));
+            }
+        }
+    }
+
     public function migrate(Request $request, TargetDb $targetDb)
     {
-        $archiveTables = ArchiveTableCreator::getTablesArchivesInstalled();
-        $archiveTables = array_unique($archiveTables);
-        $this->log(sprintf('Found %s archive tables', count($archiveTables)));
+        if ($this->archiveTables === null) {
+            throw new \LogicException('Archive migration must be prepared before copying data.');
+        }
+        $this->log(sprintf('Found %s archive tables', count($this->archiveTables)));
 
         $sourcePrefix = Common::prefixTable('');
 
-        foreach ($archiveTables as $archiveTable) {
-            $isSourceTable = strpos($archiveTable, $sourcePrefix . 'archive_') === 0;
-            if (!$isSourceTable) {
-                $this->log('Skipping table because it is a target table ' . $archiveTable  . ' and source prefix is:' . $sourcePrefix);
-                // special case...
-                // user is migrating from one matomo instance to another matomo instance with the same DB but different
-                // prefix... we can only take into consideration the DB tables that belong to the source DB
-                // I think it also only happens when the source DB prefix is an empty string
+        foreach ($this->archiveTables as $archiveTable) {
+            if (!$this->isSourceArchiveTable($archiveTable, $sourcePrefix)) {
+                $this->log('Skipping table ' . $archiveTable . ' because it is not a monthly archive table of the source');
                 continue;
             }
 
             $this->log('Starting to migrate archive table ' . $archiveTable);
-            $archiveTable = str_replace($sourcePrefix, '', $archiveTable);
-            $targetDb->createArchiveTableIfNeeded($archiveTable);
+            $archiveTable = substr($archiveTable, strlen($sourcePrefix));
 
+            $numSkippedRecords = 0;
             $batchQuery = new BatchQuery($limit = 1000);
             $archiveTablePrefixed = Common::prefixTable($archiveTable);
             foreach ($batchQuery->generateQuery('SELECT * FROM ' . $archiveTablePrefixed . ' WHERE idsite = ? ORDER BY idarchive,`name` ASC', array($request->sourceIdSite)) as $archives) {
                 foreach ($archives as $archive) {
+                    if (!empty($archive['idarchive']) && $this->pluginDataMigrator) {
+                        // the name of some plugin records contains the ID of a row of a plugin table, which may be different on the target
+                        $name = $this->pluginDataMigrator->getTargetArchiveRecordName($archive['name'], $request->idMaps);
+                        if ($name === null) {
+                            $numSkippedRecords++;
+                            continue;
+                        }
+                        if (strpos($archiveTable, 'archive_blob_') === 0) {
+                            $archive['value'] = $this->pluginDataMigrator->getTargetArchiveBlobValue($archive['name'], $archive['value'], $request->idMaps);
+                        }
+                        $archive['name'] = $name;
+                    }
                     if (!empty($archive['idarchive'])) {
                         $archive['idarchive'] = $this->createArchiveId($targetDb, $archiveTable, $archive['idarchive']);
                         $archive['idsite']    = $request->targetIdSite;
@@ -69,9 +105,18 @@ class ArchiveMigration extends BaseMigration
                     }
                 }
             }
+            if ($numSkippedRecords) {
+                $this->log(sprintf('Skipped %s archive records of plugin data that was not migrated', $numSkippedRecords));
+            }
             $this->log('Migrated archive table ' . $archiveTable);
         }
         $this->idArchiveMap = array();
+    }
+
+    private function isSourceArchiveTable(string $table, string $sourcePrefix): bool
+    {
+        // The core LIKE query also returns tables belonging to overlapping destination prefixes.
+        return (bool) preg_match('/\A' . preg_quote($sourcePrefix, '/') . 'archive_(?:numeric|blob)_[0-9]{4}_[0-9]{2}\z/', $table);
     }
 
     private function createArchiveId(TargetDb $targetDb, $archiveTable, $soruceArchiveId)
