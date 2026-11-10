@@ -118,9 +118,10 @@ logs and imported search-console data; `--skip-archives` excludes archived repor
 migration without writing data. Unknown ID-like columns cause validation to fail before copying. Plugin schema changes
 may require updated migration definitions. The output identifies site tables without a migration definition.
 
-If a copied segment or a custom-report filter references known plugin data that is missing or excluded, migration
+If a live segment or a custom-report filter references known plugin data that is missing or excluded, migration
 stops with an explanation instead of retaining a source ID that could select unrelated destination data. Dry runs
 check these references too. Correct the reference or include the required plugin data before retrying.
+Soft-deleted segments remain deleted; their plugin references and hashes are retained without validation or rewriting.
 
 Some plugins require additional destination configuration:
 

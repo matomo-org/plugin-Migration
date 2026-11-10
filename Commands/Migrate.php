@@ -36,20 +36,16 @@ class Migrate extends ConsoleCommand
         $this->addNoValueOption('target-db-ssl-no-verify', null, 'Disable server certificate validation of the target database host.');
         $this->addNoValueOption('skip-logs', null, 'Skip migration of logs');
         $this->addNoValueOption('skip-archives', null, 'Skip migration of archives');
-        $this->addOptionalValueOption('skip-plugin-data', null, 'Comma separated list of plugins whose data should not be migrated, eg "HeatmapSessionRecording,Funnels"');
+        $this->addRequiredValueOption('skip-plugin-data', null, 'Comma separated list of plugins whose data should not be migrated, eg "HeatmapSessionRecording,Funnels"');
         $this->addNoValueOption('dry-run', null, 'Enable debug mode where it does not insert anything.');
         $this->addNoValueOption('disable-db-transactions', null, 'Disable the usage of MySQL database transactions');
     }
-
-    /**
-     * @return int
-     */
 
     protected function doExecute(): int
     {
         $input = $this->getInput();
         $output = $this->getOutput();
-        $this->checkAllRequiredOptionsAreNotEmpty();
+        $this->checkRequiredOptions();
         $idSite = (int) $input->getOption('source-idsite');
 
         $this->checkSiteExists($idSite);
@@ -108,6 +104,21 @@ class Migrate extends ConsoleCommand
             $now = Date::now()->getDatetime();
         }
         $this->getOutput()->writeln($message . ' at ' . $now);
+    }
+
+    private function checkRequiredOptions(): void
+    {
+        foreach ($this->getDefinition()->getOptions() as $option) {
+            $name = $option->getName();
+            $value = $this->getInput()->getOption($name);
+            // This option requires a value when supplied, but may be omitted entirely.
+            if ($name === 'skip-plugin-data' && $value === null) {
+                continue;
+            }
+            if ($option->isValueRequired() && empty($value)) {
+                throw new \InvalidArgumentException(sprintf('The required option --%s is not set', $name));
+            }
+        }
     }
 
     private function checkSiteExists($idSite)

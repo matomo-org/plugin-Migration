@@ -173,6 +173,16 @@ class MigratePluginDataTest extends ConsoleCommandTestCase
         return ['real migration' => [false], 'dry run' => [true]];
     }
 
+    public function test_runMigration_rejectsSkipPluginDataWithoutValue(): void
+    {
+        $before = $this->getTargetRowCounts();
+        $result = $this->runCommand(['--skip-plugin-data' => null]);
+
+        $this->assertSame(1, $result, $this->applicationTester->getDisplay());
+        $this->assertStringContainsString('The "--skip-plugin-data" option requires a value.', $this->applicationTester->getDisplay());
+        $this->assertSame($before, $this->getTargetRowCounts());
+    }
+
     public function test_runMigration_failsForUnknownPluginToSkip()
     {
         $result = $this->runCommand(['--skip-plugin-data' => 'Migration,UnknownPlugin']);

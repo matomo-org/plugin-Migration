@@ -33,7 +33,8 @@ class PluginDataMigrator
     private const PHASE_VISIT = 'visit';
     private const PHASE_SHARED = 'shared';
     /**
-     * Raw data of the site that doesn't belong to visits, migrated after the visits, see TableDefinition::forSiteLog()
+     * Raw data of the site that doesn't belong to visits, migrated before the visit batches in LogMigration,
+     * see TableDefinition::forSiteLog()
      */
     private const PHASE_SITE_LOG = 'site_log';
 
@@ -229,9 +230,11 @@ class PluginDataMigrator
 
         // Validate source definitions even in a dry run, where the copied destination rows do not exist.
         // Include on-demand global segments and references to skipped plugins.
+        // Deleted segments can refer to removed plugin rows and cannot be repaired through the UI. Keep their
+        // deleted definitions and hashes unchanged, without treating them as live filters.
         foreach (array_keys($request->idMaps->getAll(TableDefinition::SEGMENT)) as $sourceId) {
-            $source = Db::fetchRow('SELECT definition FROM ' . $this->quoteSourceTable('segment') . ' WHERE idsegment = ?', [$sourceId]);
-            if (is_array($source) && is_string($source['definition'] ?? null)) {
+            $source = Db::fetchRow('SELECT definition, deleted FROM ' . $this->quoteSourceTable('segment') . ' WHERE idsegment = ?', [$sourceId]);
+            if (is_array($source) && empty($source['deleted']) && is_string($source['definition'] ?? null)) {
                 SegmentsMigration::pointPluginDataToTargetIds($source['definition'], $request->idMaps, $segmentTables);
             }
         }
@@ -249,7 +252,7 @@ class PluginDataMigrator
         foreach (array_keys($copiedSegments) as $idSegment) {
             // the copies belong to the target site, in a dry run nothing was inserted
             $segment = $targetDb->fetchRow("SELECT * FROM $segmentTable WHERE idsegment = ? AND enable_only_idsite = ?", [$idSegment, $targetIdSite]);
-            if (!is_array($segment) || !is_string($segment['definition'] ?? null)) {
+            if (!is_array($segment) || !empty($segment['deleted']) || !is_string($segment['definition'] ?? null)) {
                 continue;
             }
             $definition = SegmentsMigration::pointPluginDataToTargetIds($segment['definition'], $request->idMaps, $segmentTables);
@@ -276,7 +279,7 @@ class PluginDataMigrator
             unset($pendingSegments[$idSegment]);
             $segment = $targetDb->fetchRow("SELECT * FROM $segmentTable WHERE idsegment = ? AND enable_only_idsite = ?", [$idSegment, $targetIdSite]);
             if (
-                !is_array($segment) || !is_string($segment['definition'] ?? null)
+                !is_array($segment) || !empty($segment['deleted']) || !is_string($segment['definition'] ?? null)
                 || !SegmentsMigration::hasPluginDataIds($segment['definition'], $segmentTables)
             ) {
                 continue;

@@ -12,6 +12,7 @@ namespace Piwik\Plugins\Migration\tests\Integration\Migrations;
 use Piwik\Common;
 use Piwik\Db;
 use Piwik\Plugins\Migration\Migrations;
+use Piwik\Plugins\Migration\Migrations\LogActionMigration;
 use Piwik\Plugins\Migration\Migrations\PluginDataMigration;
 use Piwik\Plugins\Migration\Migrations\Request;
 use Piwik\Plugins\Migration\Migrations\SegmentsMigration;
@@ -50,6 +51,7 @@ class SegmentsMigrationTest extends IntegrationTestCase
         $tables = [
             'mtest_segment_item' => 'iditem INT UNSIGNED NOT NULL AUTO_INCREMENT, idsite INT UNSIGNED NOT NULL, name VARCHAR(50) NOT NULL, PRIMARY KEY (iditem)',
             'mtest_segment_report' => 'idreport INT UNSIGNED NOT NULL AUTO_INCREMENT, idsite INT UNSIGNED NOT NULL, idsegment INT UNSIGNED NOT NULL, name VARCHAR(50) NOT NULL, PRIMARY KEY (idreport)',
+            'mtest_segment_visit' => 'idrow INT UNSIGNED NOT NULL AUTO_INCREMENT, idsite INT UNSIGNED NOT NULL, idvisit INT UNSIGNED NOT NULL, idsegment INT UNSIGNED NOT NULL, PRIMARY KEY (idrow)',
         ];
         foreach ($tables as $table => $columns) {
             Db::query('CREATE TABLE `' . Common::prefixTable($table) . '` (' . $columns . ')');
@@ -61,13 +63,14 @@ class SegmentsMigrationTest extends IntegrationTestCase
         $definition->addTable(TableDefinition::forSite('mtest_segment_item')->autoIncrement('iditem')->identifiedBy('name'));
         $definition->addTable(TableDefinition::forSite('mtest_segment_report')->autoIncrement('idreport')->identifiedBy('name')->references('idsegment', TableDefinition::SEGMENT));
         $definition->identifiesSegmentsBy('mtestItem', 'mtest_segment_item');
+        $definition->addTable(TableDefinition::childOf('mtest_segment_visit', TableDefinition::VISIT, 'idvisit')->autoIncrement('idrow')->references('idsegment', TableDefinition::SEGMENT));
         $this->definitions = new PluginDefinitions();
         $this->definitions->add($definition);
     }
 
     public function tearDown(): void
     {
-        foreach (['mtest_segment_item', 'mtest_segment_report'] as $table) {
+        foreach (['mtest_segment_item', 'mtest_segment_report', 'mtest_segment_visit'] as $table) {
             Db::query('DROP TABLE IF EXISTS `' . Common::prefixTable($table) . '`');
             Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . $table . '`');
         }
@@ -187,6 +190,94 @@ class SegmentsMigrationTest extends IntegrationTestCase
         $this->assertSame($sourceBefore, Db::fetchAll('SELECT * FROM ' . Common::prefixTable('segment') . ' ORDER BY idsegment'));
         $this->assertSame(0, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM segment_target_mtest_segment_report'));
         $this->assertSame(1, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM segment_target_mtest_segment_item'));
+    }
+
+    /** @dataProvider getDeletedSegmentCases */
+    public function test_deletedPluginSegmentsDoNotBlockMigration(bool $global, bool $dryRun, bool $skipPlugin, bool $hasItem, bool $encoded): void
+    {
+        if ($hasItem) {
+            $this->insertSource('mtest_segment_item', ['iditem' => 79, 'idsite' => 1, 'name' => 'Source item']);
+        }
+        $this->targetDb->insert('mtest_segment_item', ['iditem' => 79, 'idsite' => 99, 'name' => 'Unrelated target item']);
+        $definition = $this->definition(79, $encoded);
+        $deleted = $this->segment(100, $global ? 0 : 1, 'Deleted source segment', $definition);
+        $deleted['deleted'] = 1;
+        $this->insertSource('segment', $deleted);
+        $this->insertSource('segment', $this->segment(101, 1, 'Live source segment', 'visitCount==1'));
+        $this->targetDb->insert('segment', $this->segment(500, 2, 'Live target segment', $definition));
+        $this->insertSource('mtest_segment_report', ['idreport' => 10, 'idsite' => 1, 'idsegment' => 100, 'name' => 'Report with deleted segment']);
+
+        // References from another plugin still pull in a global segment when the selected plugin is skipped.
+        $items = new PluginDefinition('Migration');
+        $items->addTable(TableDefinition::forSite('mtest_segment_item')->autoIncrement('iditem'));
+        $items->identifiesSegmentsBy('mtestItem', 'mtest_segment_item');
+        $reports = new PluginDefinition('CoreHome');
+        $reports->addTable(TableDefinition::forSite('mtest_segment_report')->autoIncrement('idreport')->references('idsegment', TableDefinition::SEGMENT));
+        $definitions = new PluginDefinitions();
+        $definitions->add($items);
+        $definitions->add($reports);
+        $sourceBefore = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('segment') . ' ORDER BY idsegment');
+        $targetBefore = $this->targetDb->getDb()->fetchAll('SELECT * FROM segment_target_segment ORDER BY idsegment');
+        if ($dryRun) {
+            $this->targetDb->enableDryRun();
+        }
+        $request = $this->request();
+        $migrator = new PluginDataMigrator($definitions, $skipPlugin ? ['Migration'] : []);
+        (new Migrations())->migrate([new SegmentsMigration(), new PluginDataMigration($migrator, false)], $request, $this->targetDb);
+
+        $this->assertSame($sourceBefore, Db::fetchAll('SELECT * FROM ' . Common::prefixTable('segment') . ' ORDER BY idsegment'));
+        $this->assertNotNull($request->idMaps->get(TableDefinition::SEGMENT, 100));
+        if ($dryRun) {
+            $this->assertSame($targetBefore, $this->targetDb->getDb()->fetchAll('SELECT * FROM segment_target_segment ORDER BY idsegment'));
+            $this->assertSame(0, (int) $this->targetDb->fetchOne('SELECT COUNT(*) FROM segment_target_mtest_segment_report'));
+            return;
+        }
+        $copy = $this->targetDb->fetchRow('SELECT * FROM segment_target_segment WHERE idsegment = ?', [$request->idMaps->get(TableDefinition::SEGMENT, 100)]);
+        $this->assertSame(1, (int) $copy['deleted']);
+        $this->assertSame($definition, $copy['definition']);
+        $this->assertSame($deleted['hash'], $copy['hash']);
+        $this->assertSame(['Report with deleted segment' => $definition], $this->reportDefinitions());
+        $this->assertSame($targetBefore[0], $this->targetDb->fetchRow('SELECT * FROM segment_target_segment WHERE idsegment = 500'));
+        $this->assertSame('visitCount==1', $this->targetDb->fetchOne('SELECT definition FROM segment_target_segment WHERE idsegment = ?', [$request->idMaps->get(TableDefinition::SEGMENT, 101)]));
+    }
+
+    public static function getDeletedSegmentCases(): array
+    {
+        return [
+            'missing site item' => [false, false, false, false, false],
+            'missing site item dry run' => [false, true, false, false, false],
+            'missing global item' => [true, false, false, false, false],
+            'missing global item dry run' => [true, true, false, false, false],
+            'skipped plugin' => [false, false, true, true, false],
+            'skipped global plugin dry run' => [true, true, true, true, false],
+            'encoded site' => [false, false, false, false, true],
+            'encoded global' => [true, false, false, false, true],
+            'mapped site item stays deleted' => [false, false, false, true, false],
+            'mapped global item stays deleted' => [true, false, false, true, false],
+        ];
+    }
+
+    public function test_visitBatchKeepsSiteSegmentMappingAfterCopyingGlobalSegment(): void
+    {
+        $this->insertSource('segment', $this->segment(100, 0, 'Global segment', 'visitCount==2'));
+        $this->insertSource('segment', $this->segment(101, 1, 'Site segment', 'visitCount==3'));
+        $this->targetDb->insert('segment', $this->segment(500, 99, 'Other site segment', 'visitCount==4'));
+        $this->insertSource('mtest_segment_visit', ['idrow' => 1, 'idsite' => 1, 'idvisit' => 50, 'idsegment' => 100]);
+        $this->insertSource('mtest_segment_visit', ['idrow' => 2, 'idsite' => 1, 'idvisit' => 50, 'idsegment' => 101]);
+        $request = $this->request();
+        $this->migrate($request);
+        $siteSegmentId = $request->idMaps->get(TableDefinition::SEGMENT, 101);
+
+        $this->migrator->migrateVisitData($request, $this->targetDb, [50 => 150], [], new LogActionMigration());
+
+        $this->assertSame(['migrated' => 2, 'skipped' => 0, 'existing' => 0], $this->migrator->getVisitDataCounts()['mtest_segment_visit']);
+        $rows = $this->targetDb->getDb()->fetchAll('SELECT v.idsite, v.idvisit, v.idsegment, s.definition FROM segment_target_mtest_segment_visit v JOIN segment_target_segment s ON v.idsegment = s.idsegment ORDER BY v.idrow');
+        $this->assertCount(2, $rows);
+        $this->assertSame(['visitCount==2', 'visitCount==3'], array_column($rows, 'definition'));
+        $this->assertEquals([2, 2], array_column($rows, 'idsite'));
+        $this->assertEquals([150, 150], array_column($rows, 'idvisit'));
+        $this->assertEquals($siteSegmentId, $rows[1]['idsegment']);
+        $this->assertSame($siteSegmentId, $request->idMaps->get(TableDefinition::SEGMENT, 101));
     }
 
     public static function getUnresolvedSegmentCases(): array

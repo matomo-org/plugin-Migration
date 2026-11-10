@@ -53,13 +53,16 @@ final class IdMaps
      */
     public function get(string $table, $sourceId)
     {
-        if (isset($this->maps[$table])) {
-            return $this->maps[$table][$sourceId] ?? null;
+        if (isset($this->maps[$table][$sourceId])) {
+            return $this->maps[$table][$sourceId];
         }
         return $this->parent ? $this->parent->get($table, $sourceId) : null;
     }
 
     /**
+     * Enumerates this map's table, or its parent's table if none was set here. Unlike get(), this keeps a batch's
+     * parent rows local, so copying children does not process rows from outside that batch.
+     *
      * @return array<int|string, int|string> source ID => target ID
      */
     public function getAll(string $table): array
