@@ -19,6 +19,7 @@ use Piwik\Plugins\Migration\PluginData\PluginDefinition;
 use Piwik\Plugins\Migration\PluginData\PluginDefinitions;
 use Piwik\Plugins\Migration\PluginData\TableDefinition;
 use Piwik\Plugins\Migration\TargetDb;
+use Piwik\Plugins\SitesManager\API as SitesAPI;
 use Piwik\Tests\Framework\TestCase\IntegrationTestCase;
 
 /**
@@ -43,6 +44,7 @@ class PluginDataMigratorTest extends IntegrationTestCase
         'mtest_shared' => '`idshared` INT UNSIGNED NOT NULL AUTO_INCREMENT, `hash` INT UNSIGNED NOT NULL, `name` VARCHAR(50) NOT NULL, PRIMARY KEY (`idshared`)',
         'mtest_import' => '`property` VARCHAR(50) NOT NULL, `date` DATE NOT NULL, `data` TEXT NULL, PRIMARY KEY (`property`, `date`)',
         'mtest_import_by_date' => '`property` VARCHAR(50) NOT NULL, `date` DATE NOT NULL, `data` TEXT NULL, PRIMARY KEY (`date`)',
+        'mtest_log' => '`idrow` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, `idsite` INT UNSIGNED NOT NULL, `server_time` DATETIME NOT NULL, `data` TEXT NULL',
     ];
 
     /**
@@ -85,6 +87,47 @@ class PluginDataMigratorTest extends IntegrationTestCase
         $this->assertEquals([], $this->validate($definition));
     }
 
+    /** @dataProvider getExistingConfigurationRuns */
+    public function test_existingConfigurationKeepsItsValuesAndMapsParentAndChildIds(bool $dryRun, bool $differentSettings): void
+    {
+        foreach ([Common::prefixTable(''), self::TARGET_PREFIX] as $prefix) {
+            Db::query('ALTER TABLE ' . $prefix . 'mtest_item ADD enabled INT NOT NULL DEFAULT 1, ADD copy_of INT NULL');
+            Db::query('ALTER TABLE ' . $prefix . 'mtest_item_part ADD idpart INT AUTO_INCREMENT PRIMARY KEY, ADD position INT NOT NULL');
+        }
+        Db::get()->insert(Common::prefixTable('mtest_item'), ['iditem' => 7, 'idsite' => 1, 'name' => 'Existing configuration', 'enabled' => (int) $differentSettings, 'copy_of' => 7]);
+        Db::get()->insert(Common::prefixTable('mtest_item_part'), ['idpart' => 8, 'iditem' => 7, 'name' => $differentSettings ? 'Source setting' : 'Destination setting', 'position' => 1]);
+        $this->targetDb->insert('mtest_item', ['iditem' => 79, 'idsite' => 2, 'name' => 'Existing configuration', 'enabled' => 0, 'copy_of' => 79]);
+        $this->targetDb->insert('mtest_item_part', ['idpart' => 80, 'iditem' => 79, 'name' => 'Destination setting', 'position' => 1]);
+        $definition = new PluginDefinition(self::PLUGIN_NAME);
+        $definition->addTable(TableDefinition::forSite('mtest_item')->autoIncrement('iditem')->identifiedBy('name')->referencesOwnTable('copy_of'));
+        $definition->addTable(TableDefinition::childOf('mtest_item_part', 'mtest_item', 'iditem')->autoIncrement('idpart')->identifiedBy('position'));
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        $migrator = new PluginDataMigrator($definitions);
+        $this->assertSame([], $migrator->validate($this->targetDb, true));
+        $request = new Request();
+        $request->sourceIdSite = 1;
+        $request->targetIdSite = 2;
+        $request->isExistingTargetSite = true;
+        $request->idMaps->set('site', 1, 2);
+        if ($dryRun) {
+            $this->targetDb->enableDryRun();
+        }
+        $migrator->migrateSiteData($request, $this->targetDb);
+        $this->assertEquals(79, $request->idMaps->get('mtest_item', 7));
+        $this->assertEquals(80, $request->idMaps->get('mtest_item_part', 8));
+        $this->assertEquals(1, $this->targetDb->fetchOne('SELECT COUNT(*) FROM testprefix_mtest_item'));
+        $this->assertEquals(0, $this->targetDb->fetchOne('SELECT enabled FROM testprefix_mtest_item WHERE iditem = 79'));
+        $this->assertEquals(1, $this->targetDb->fetchOne('SELECT COUNT(*) FROM testprefix_mtest_item_part'));
+        $this->assertSame('Destination setting', $this->targetDb->fetchOne('SELECT name FROM testprefix_mtest_item_part WHERE idpart = 80'));
+        $this->assertSame($differentSettings, $request->archivesNotCopiedReason !== null, 'Only different definitions require rebuilding; remapped self/child IDs alone do not.');
+    }
+
+    public static function getExistingConfigurationRuns(): array
+    {
+        return ['different settings' => [false, true], 'different settings dry run' => [true, true], 'equivalent settings' => [false, false], 'equivalent settings dry run' => [true, false]];
+    }
+
     /**
      * @dataProvider getTableKinds
      */
@@ -102,7 +145,7 @@ class PluginDataMigratorTest extends IntegrationTestCase
         $definitions = new PluginDefinitions();
         $definitions->add($definition);
         Db::query('DROP TABLE ' . Common::prefixTable('mtest_item'));
-        Db::query('ALTER TABLE ' . self::TARGET_PREFIX . 'mtest_import ADD extra_column INT NULL');
+        Db::query('ALTER TABLE ' . self::TARGET_PREFIX . 'mtest_import ADD extra_column INT NOT NULL');
 
         $migration = new PluginDataMigration(new PluginDataMigrator($definitions), true);
         $this->assertSame([
@@ -233,6 +276,45 @@ class PluginDataMigratorTest extends IntegrationTestCase
     public static function getSiteLogCases(): array
     {
         return ['primary key' => [true, false], 'unique index' => [false, false], 'primary dry run' => [true, true], 'unique dry run' => [false, true]];
+    }
+
+    public function test_dateRangeFiltersSiteLogsInUtcAndPropertyDataByCalendarDay(): void
+    {
+        $idSite = SitesAPI::getInstance()->addSite('Source', ['https://example.com'], timezone: 'Europe/Bucharest');
+        $definition = new PluginDefinition(self::PLUGIN_NAME);
+        $definition->addTable(TableDefinition::forSiteLog('mtest_log', 'server_time')->autoIncrement('idrow'));
+        $definition->addTable(TableDefinition::forSiteKeys('mtest_import', 'property', 'date', [$this, 'getSiteKeys']));
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        $migrator = new PluginDataMigrator($definitions);
+        foreach (['2024-01-22 21:59:59', '2024-01-22 22:00:00', '2024-01-23 21:59:59', '2024-01-23 22:00:00'] as $time) {
+            Db::get()->insert(Common::prefixTable('mtest_log'), ['idsite' => $idSite, 'server_time' => $time, 'data' => $time]);
+        }
+        foreach (['2024-01-22', '2024-01-23', '2024-01-24'] as $date) {
+            Db::get()->insert(Common::prefixTable('mtest_import'), ['property' => 'https://example.com/', 'date' => $date, 'data' => 'source']);
+        }
+        Db::get()->insert(Common::prefixTable('mtest_log'), ['idsite' => $idSite + 1, 'server_time' => '2024-01-23 12:00:00', 'data' => 'other site']);
+        Db::get()->insert(Common::prefixTable('mtest_import'), ['property' => 'https://other.example/', 'date' => '2024-01-23', 'data' => 'other property']);
+        $this->targetDb->insert('mtest_import', ['property' => 'https://example.com/', 'date' => '2024-01-23', 'data' => 'destination']);
+        $request = new Request();
+        $request->sourceIdSite = $idSite;
+        $request->targetIdSite = 100;
+        $request->startDate = '2024-01-23';
+        $request->endDate = '2024-01-23';
+        $request->idMaps->set(TableDefinition::SITE, $idSite, 100);
+
+        $counts = $migrator->migrateSiteLogData($request, $this->targetDb, new LogActionMigration());
+
+        $this->assertSame(2, $counts['mtest_log']['migrated']);
+        $this->assertEquals([
+            ['idsite' => 100, 'server_time' => '2024-01-22 22:00:00'],
+            ['idsite' => 100, 'server_time' => '2024-01-23 21:59:59'],
+        ], $this->targetDb->fetchAll('SELECT idsite, server_time FROM ' . $this->targetDb->quoteTable('mtest_log') . ' ORDER BY idrow'));
+        $this->assertSame(1, $counts['mtest_import']['present']);
+        $this->assertSame(0, $counts['mtest_import']['migrated']);
+        $this->assertSame([
+            ['property' => 'https://example.com/', 'date' => '2024-01-23', 'data' => 'destination'],
+        ], $this->targetDb->fetchAll('SELECT * FROM ' . $this->targetDb->quoteTable('mtest_import')));
     }
 
     public function test_validate_refusesTheFeaturesWhereTheyAreNotSupported()

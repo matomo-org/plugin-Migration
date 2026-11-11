@@ -62,19 +62,25 @@ class CustomAlertsMigration extends BaseMigration
         $maxId = $targetDb->fetchRow('SELECT MAX(idalert) AS idalert FROM ' . $targetDb->prefixTable('alert'));
         $nextId = (int) $maxId['idalert'];
         $idMap = [];
+        $added = 0;
         foreach ($alerts as $alert) {
             $sourceId = $alert['idalert'];
             $alert = $this->translateReportReferences($alert, $resolver, 'custom alert ' . $sourceId);
             $isActiveForSite = $alert['migration_idsite'] !== null;
             unset($alert['migration_idsite']);
-            $alert['idalert'] = ++$nextId;
-            $targetDb->insert('alert', $alert);
+            unset($alert['idalert']);
+            $existingId = $request->isExistingTargetSite ? $this->findExistingAlert($alert, $request, $targetDb) : null;
+            $alert['idalert'] = $existingId ?? ++$nextId;
+            if ($existingId === null) {
+                $targetDb->insert('alert', $alert);
+                ++$added;
+            }
             $idMap[$sourceId] = $alert['idalert'];
-            if ($isActiveForSite) {
+            if ($isActiveForSite && !$targetDb->fetchOne('SELECT 1 FROM ' . $targetDb->quoteTable('alert_site') . ' WHERE idalert = ? AND idsite = ?', [$alert['idalert'], $request->targetIdSite])) {
                 $targetDb->insert('alert_site', ['idalert' => $alert['idalert'], 'idsite' => $request->targetIdSite]);
             }
         }
-        $this->log(sprintf('Migrated %s custom alerts', count($alerts)));
+        $this->log(sprintf('Migrated %s custom alerts', $added));
 
         $lastId = 0;
         $count = 0;
@@ -93,6 +99,9 @@ class CustomAlertsMigration extends BaseMigration
                 unset($row['idtriggered']);
                 $row['idsite'] = $request->targetIdSite;
                 $row['idalert'] = $idMap[$row['idalert']];
+                if ($request->isExistingTargetSite && $this->historyExists($row, $targetDb)) {
+                    continue;
+                }
                 $targetDb->insert('alert_triggered', $row);
                 ++$count;
             }
@@ -134,6 +143,41 @@ class CustomAlertsMigration extends BaseMigration
             $row['metric'] = 'custom_metric_' . $metricId;
         }
 
+        if (is_string($row['metric'])) {
+            $row['metric'] = $resolver->resolveSiteMetric($row['metric']);
+        }
+
         return $row;
+    }
+
+    /** @param array<string, mixed> $alert */
+    private function findExistingAlert(array $alert, Request $request, TargetDb $targetDb): ?int
+    {
+        $where = [];
+        $bind = [];
+        foreach ($alert as $column => $value) {
+            $where[] = 'a.' . $targetDb->quoteIdentifier($column) . ' <=> ?';
+            $bind[] = $value;
+        }
+        $bind[] = $request->targetIdSite;
+        $bind[] = $request->targetIdSite;
+        $id = $targetDb->fetchOne(
+            'SELECT a.idalert FROM ' . $targetDb->quoteTable('alert') . ' a WHERE ' . implode(' AND ', $where)
+            . ' AND (EXISTS (SELECT 1 FROM ' . $targetDb->quoteTable('alert_site') . ' s WHERE s.idalert = a.idalert AND s.idsite = ?)'
+            . ' OR EXISTS (SELECT 1 FROM ' . $targetDb->quoteTable('alert_triggered') . ' h WHERE h.idalert = a.idalert AND h.idsite = ?))'
+            . ' ORDER BY a.idalert LIMIT 1',
+            $bind
+        );
+        return $id === false ? null : (int) $id;
+    }
+
+    /** @param array<string, mixed> $row */
+    private function historyExists(array $row, TargetDb $targetDb): bool
+    {
+        $where = [];
+        foreach (array_keys($row) as $column) {
+            $where[] = $targetDb->quoteIdentifier($column) . ' <=> ?';
+        }
+        return (bool) $targetDb->fetchOne('SELECT 1 FROM ' . $targetDb->quoteTable('alert_triggered') . ' WHERE ' . implode(' AND ', $where) . ' LIMIT 1', array_values($row));
     }
 }

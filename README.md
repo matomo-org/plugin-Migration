@@ -20,8 +20,9 @@ Before executing the migration command we always recommend to make a backup of t
 it first with the `dry-run` flag (dry-run is faster but can take a long time as well and will give you an idea of how long migration
 will take).
 
-__NOTE:__ The migration tool will create a __new website__ in the target Matomo, using the next available `siteid`, and copy all the data from the source website to this newly created target website.
-Remember to update the tracking code to match the new `siteid`.
+By default, the migration creates a **new website** in the target Matomo using the next available `siteid`.
+Remember to update the tracking code to match that ID. To use a site that already exists on the destination, pass
+`--target-idsite`; see [Migrating into an existing website](#migrating-into-an-existing-website).
 
 To start a migration execute the `migration:measurable` command, example:
 
@@ -33,6 +34,10 @@ Optional parameters are:
 
 ```
  --target-db-prefix=piwik_                          Target database table prefix (default: "")
+ --target-idsite=7                                 Use this existing destination website instead of creating one
+ --target-site-is-offline                          Confirm destination tracking and archiving stay stopped while importing into --target-idsite
+ --start-date=2024-01-01                           First day to migrate, in the source website's timezone
+ --end-date=2024-12-31                             Last day to migrate, in the source website's timezone
  --target-db-port=3306                              Target database port (default: "3306")
  --target-db-enable-ssl                             Used for establishing secure connections using SSL with target database host
  --target-db-ssl-ca=/etc/ssl/certs/cert.pem         The path name to the certificate authority file (default: "/etc/ssl/certs/cert.pem")
@@ -70,17 +75,93 @@ does not commit an in-progress migration. With database transactions enabled and
 copying errors roll back the copied data. Empty archive tables and reserved sequence values from preparation can
 remain after a failure. A dry run does not create these tables or change their sequences.
 
-After a rolled-back failure, correct its cause and run the command again. Each successful run creates a new website;
-the command does not resume or deduplicate a partially committed migration. If transactions were disabled, inspect
-and remove the incomplete destination website before retrying.
+After a rolled-back failure, correct its cause and run the command again. Without `--target-idsite`, each successful
+run creates a new website. The command does not resume or deduplicate a partially committed migration. If transactions
+were disabled, restore the destination backup before retrying an import into an existing site, or remove the
+incomplete newly created destination website.
+
+### Migrating into an existing website
+
+Pass `--target-idsite=7` alongside the source and target database options to import into destination Site ID 7.
+The ID must already exist and have the same measurable type as the source (for example, website or roll-up); it can
+be empty or contain data. This option does not reserve an unused ID or create a
+website with a chosen ID. Create the destination website through Matomo first.
+
+The destination keeps its name, main URL, timezone, currency and site settings. Missing source alias URLs are added,
+and its creation date is moved earlier when needed for the imported history. Existing visits and reports remain.
+Matching goals, custom dimensions, segments, alerts and premium configuration are reused; missing definitions are
+added. Custom dimensions match by name and scope; premium definitions use the identity columns declared by each
+plugin definition. Existing configuration takes precedence when those identities match.
+Children of reused premium definitions must also match: for example, the migration stops if a source funnel has a
+step missing from its matching destination funnel, instead of changing the destination funnel. Extra destination
+children are preserved, but make source reports incompatible with that configuration.
+
+Conflicting goal and custom-dimension IDs are remapped, including conversion values, dimension log columns, segments
+and plugin references. The command lists changed IDs: update `trackGoal()` and `setCustomDimension()` calls when
+switching tracking to the destination. If the destination lacks free dimension columns, the command stops before
+copying data and explains how to add capacity.
+
+Visits are **appended**, without deduplication. An overlap warning identifies destination visits in the selected
+source period. Repeating a successful import can duplicate visits and interactions even when configuration is
+reused. Ecommerce orders already present with the same order ID, and their items, are skipped. Stop source tracking
+or use a historical cutoff that excludes visits already collected at the destination. Avoid editing destination
+configuration during the import.
+
+Imports into an existing website rebuild reports by default, including when the website is currently empty.
+To preserve source archives in a compatible empty destination, stop destination tracking and archiving first and
+add `--target-site-is-offline` alongside `--target-idsite`. Keep them stopped until the migration completes.
+The option confirms that you have paused those processes; it does not stop or lock them. The migration checks the
+destination again before copying, but that check cannot protect against writes that happen later.
+
+Even with this option, source reports are not copied when the destination already has visits or archived reports, uses another timezone,
+needs different goal or custom-dimension IDs, or reuses premium definitions with different settings. Copying them
+could hide destination data or report against the wrong definitions. Instead, the command prints the destination
+`core:invalidate-report-data` and `core:archive` commands
+needed to rebuild reports for the imported visits, including when `--skip-archives` is used. Before running them,
+ensure the destination has the retained raw data from **both** instances for the affected periods. Rebuilding can
+replace existing destination totals with incomplete data if either instance purged its raw data. **Reports whose
+raw data has been deleted cannot be rebuilt or merged this way.** If preserving such history is required, use a new
+website or a compatible empty destination with unchanged goal and dimension IDs and equivalent premium definitions;
+for an existing empty destination, pause its tracking and archiving and supply `--target-site-is-offline`.
+
+Run the suggested invalidation commands with `-v` to see dates skipped by destination log-retention settings.
+If those settings exclude imported dates, first verify that the raw data needed from both instances is present and
+will remain available until rebuilding completes. Then repeat the invalidation command with
+`--ignore-log-deletion-limit` and run `core:archive`. This flag bypasses a safeguard: do not use it to rebuild
+historical totals when the underlying raw data is missing.
+
+If reports cannot be copied, `--skip-logs` fails because rebuilding requires raw data. Core checks run before copying.
+Premium configuration conflicts discovered during ID translation roll back the import when transactions are enabled.
+Use both `--skip-logs --skip-archives` only when intentionally copying configuration and alert history without visits
+or reports.
+
+### Selecting dates
+
+`--start-date` and `--end-date` accept inclusive calendar dates in `YYYY-MM-DD` format. Either bound may be omitted.
+For example, add `--target-idsite=7 --end-date=2024-12-31` to import historical data before tracking began on the
+destination on 1 January 2025, provided there is no earlier overlap.
+
+Visits are selected by their last action in the source website's timezone. Each selected visit is copied in full,
+including earlier actions and its premium-plugin interactions. Independent plugin logs use their UTC timestamps;
+search-console imports use their stored calendar dates. Site configuration and custom-alert history are not filtered
+by these dates.
+
+When reports can be copied, only complete report periods within the range are included. The command prints rebuild
+instructions only for excluded weeks, months and years, and for earlier days touched by visits crossing the start
+boundary. Complete copied periods are not invalidated. The rebuilt partial periods include retained raw data and
+copied subperiod reports; they cannot recover history outside the imported range. With `--skip-logs`, partial periods
+cannot be rebuilt from this import.
+Retention settings can also skip excluded weeks, months and years. Use `-v` to inspect the skipped dates and add
+`--ignore-log-deletion-limit` only after checking that the retained raw data or copied subperiod reports needed to
+build those periods are available. Keep the printed `--periods` selection so complete copied periods stay intact.
 
 ### Custom alerts
 
 If CustomAlerts is active on the source, the selected website's alert definitions and triggered history are copied.
-Install CustomAlerts with matching tables on the destination. Shared alerts are assigned only to the new destination
+Install CustomAlerts with matching tables on the destination. Shared alerts are assigned only to the destination
 website; definitions needed only by historical snapshots are copied without assigning them to the website.
 
-Alerts are migrated after premium plugin configuration. Report references and custom-metric IDs in each definition
+Alerts are migrated after premium plugin configuration. Report references, custom-metric IDs and goal and custom-dimension metric references in each definition
 and historical snapshot are translated independently, preserving the report used when the alert fired. If a known
 reference cannot be translated because its data is missing or its plugin is excluded, the migration stops with an
 explanation. With database transactions enabled, changes are rolled back. A dry run also reports unresolved references.

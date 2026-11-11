@@ -47,6 +47,46 @@ class TargetDbTest extends IntegrationTestCase
         $this->assertSame('testprefix_log_visit', $this->targetDb->prefixTable('log_visit'));
     }
 
+    /** @dataProvider getConnectionProbeResults */
+    public function test_databaseIdentityProbeReleasesItsLock(string $result): void
+    {
+        $lock = null;
+        $target = $this->getMockBuilder(TargetDb::class)->disableOriginalConstructor()->onlyMethods(['prefixTable', 'fetchOne'])->getMock();
+        $target->method('prefixTable')->willReturn(\Piwik\Common::prefixTable(''));
+        $target->method('fetchOne')->willReturnCallback(function ($sql, $bind = []) use ($result, &$lock) {
+            if ($sql === 'SELECT DATABASE()') {
+                return \Piwik\Db::fetchOne($sql);
+            }
+            $this->assertSame('SELECT IS_USED_LOCK(?)', $sql);
+            $lock = $bind[0];
+            $this->assertNotNull(\Piwik\Db::fetchOne($sql, $bind), 'The source must hold the probe lock.');
+            if ($result === 'error') {
+                throw new \RuntimeException('Probe connection failed');
+            }
+            return $result === 'same' ? \Piwik\Db::fetchOne($sql, $bind) : null;
+        });
+        $method = new \ReflectionMethod(\Piwik\Plugins\Migration\Commands\Migrate::class, 'checkSourceAndTargetAreDifferent');
+        $error = null;
+        try {
+            $method->invoke(new \Piwik\Plugins\Migration\Commands\Migrate(), $target);
+        } catch (\Exception $exception) {
+            $error = $exception->getMessage();
+        }
+        $this->assertNotNull($lock);
+        $this->assertNull(\Piwik\Db::fetchOne('SELECT IS_USED_LOCK(?)', [$lock]), 'Success, rejection and connection failures must all release the probe.');
+        if ($result === 'different') {
+            $this->assertNull($error, 'Equal schema names on different servers are valid destinations.');
+        } else {
+            $this->assertNotNull($error);
+            $this->assertStringContainsString($result === 'same' ? 'same as the source ones' : 'Probe connection failed', $error);
+        }
+    }
+
+    public static function getConnectionProbeResults(): array
+    {
+        return ['same server' => ['same'], 'different server' => ['different'], 'connection failure' => ['error']];
+    }
+
     public function test_doesTableExist()
     {
         $this->assertTrue($this->targetDb->doesTableExist($this->targetDb->prefixTable('log_visit')));

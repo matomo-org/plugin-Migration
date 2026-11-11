@@ -34,7 +34,7 @@ class Migrations
     public function migrate($migrations, Request $request, TargetDb $targetDb)
     {
         foreach ($migrations as $migration) {
-            $migration->prepare($targetDb);
+            $migration->prepare($request, $targetDb);
         }
         $targetDb->beginTransaction();
 

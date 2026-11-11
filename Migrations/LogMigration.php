@@ -14,6 +14,7 @@ use Piwik\Db;
 use Piwik\DbHelper;
 use Piwik\Plugins\Migration\Db\BatchQuery;
 use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
+use Piwik\Plugins\Migration\PluginData\TableDefinition;
 use Piwik\Plugins\Migration\TargetDb;
 
 class LogMigration extends BaseMigration
@@ -22,6 +23,12 @@ class LogMigration extends BaseMigration
      * @var PluginDataMigrator|null
      */
     private $pluginDataMigrator;
+
+    /** @var int */
+    private $numSkippedOrders = 0;
+
+    /** @var array<string, array<string, string|null>> */
+    private $customDimensionColumns = [];
 
     public function __construct(?PluginDataMigrator $pluginDataMigrator = null)
     {
@@ -47,7 +54,13 @@ class LogMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
-        $numVisits = (int) Db::fetchOne('SELECT count(*) FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ?', array($request->sourceIdSite));
+        $dateCondition = '';
+        $dateBind = [];
+        if ($request->hasDateRange()) {
+            $dateCondition = ' AND visit_last_action_time BETWEEN ? AND ?';
+            $dateBind = $request->getUtcDateTimeRange();
+        }
+        $numVisits = (int) Db::fetchOne('SELECT count(*) FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ?' . $dateCondition, array_merge([$request->sourceIdSite], $dateBind));
         $this->log(sprintf('Found %s visits', $numVisits));
 
         $logActionMigration = new LogActionMigration();
@@ -71,11 +84,11 @@ class LogMigration extends BaseMigration
         $batchQuery = new BatchQuery();
         $limit = $batchQuery->getLimit();
 
-        $sql = 'SELECT * FROM %s WHERE idsite = ? AND idvisit > ? ORDER BY idvisit ASC LIMIT %d';
+        $sql = 'SELECT * FROM %s WHERE idsite = ? AND idvisit > ?' . $dateCondition . ' ORDER BY idvisit ASC LIMIT %d';
         $sql = sprintf($sql, $table, $limit);
 
         $lastIdVisit = 0;
-        while ($visitRows = Db::fetchAll($sql, [$request->sourceIdSite, $lastIdVisit])) {
+        while ($visitRows = Db::fetchAll($sql, array_merge([$request->sourceIdSite, $lastIdVisit], $dateBind))) {
             $count += count($visitRows);
             $this->migrateVisits($visitRows, $request, $logActionMigration, $targetDb, $hasPageViewTimeTable);
             $lastIdVisit = end($visitRows)['idvisit'];
@@ -88,6 +101,9 @@ class LogMigration extends BaseMigration
             }
         }
         $this->log(sprintf('Migrated %s visits. The number of migrated visits may be higher if data is still tracked into the source Matomo while migrating the data', $count));
+        if ($this->numSkippedOrders) {
+            $this->log(sprintf('Skipped %s ecommerce orders the target site has already', $this->numSkippedOrders));
+        }
 
         if ($this->pluginDataMigrator) {
             foreach ($this->pluginDataMigrator->getVisitDataCounts() as $pluginTable => $counts) {
@@ -107,6 +123,7 @@ class LogMigration extends BaseMigration
             $row['visit_entry_idaction_name'] = $logActionMigration->migrateAction($row['visit_entry_idaction_name'], $targetDb);
             $row['visit_exit_idaction_url'] = $logActionMigration->migrateAction($row['visit_exit_idaction_url'], $targetDb);
             $row['visit_exit_idaction_name'] = $logActionMigration->migrateAction($row['visit_exit_idaction_name'], $targetDb);
+            $row = $this->moveCustomDimensionValues('log_visit', 'visit', $row, $request);
             unset($row['idvisit']);
             $visitorIdMap[$oldIdVisit] = $targetDb->insert('log_visit', $row);
         }
@@ -126,12 +143,16 @@ class LogMigration extends BaseMigration
                 $row['idaction_name_ref'] = $logActionMigration->migrateAction($row['idaction_name_ref'], $targetDb);
                 $row['idaction_event_category'] = $logActionMigration->migrateAction($row['idaction_event_category'], $targetDb);
                 $row['idaction_event_action'] = $logActionMigration->migrateAction($row['idaction_event_action'], $targetDb);
+                $row = $this->moveCustomDimensionValues('log_link_visit_action', 'action', $row, $request);
                 unset($row['idlink_va']);
                 $visitorLinkActionMap[$oldIdLinkAction] = $targetDb->insert('log_link_visit_action', $row);
             }
         }
         unset($actionRows);
 
+        $skippedOrders = array();
+        $sourceIdVisitByTargetId = array_flip($visitorIdMap);
+        $targetGoalIds = $request->idMaps->getAll(TableDefinition::GOAL);
         $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('log_conversion') . ' WHERE idvisit in (' . $visitorIds . ')');
         foreach ($rows as $row) {
             $row['idvisit'] = $visitorIdMap[$row['idvisit']];
@@ -142,13 +163,28 @@ class LogMigration extends BaseMigration
             }
             $row['idsite'] = $request->targetIdSite;
             $row['idaction_url'] = $logActionMigration->migrateAction($row['idaction_url'], $targetDb);
-            $targetDb->insert('log_conversion', $row);
+            $row['idgoal'] = $targetGoalIds[$row['idgoal']] ?? $row['idgoal']; // not the ecommerce goals 0 and -1
+            $row = $this->moveCustomDimensionValues('log_conversion', 'visit', $row, $request);
+            try {
+                $targetDb->insert('log_conversion', $row);
+            } catch (\Exception $e) {
+                // an order is unique per site, the existing target site may have it already, eg tracked into both
+                // Matomo while switching the tracking code
+                if (empty($row['idorder']) || !$this->isDuplicateEntryError($e)) {
+                    throw $e;
+                }
+                $skippedOrders[$sourceIdVisitByTargetId[$row['idvisit']]][$row['idorder']] = true;
+                $this->numSkippedOrders++;
+            }
         }
 
         unset($rows);
 
         $rows = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('log_conversion_item') . ' WHERE idvisit in (' . $visitorIds . ')');
         foreach ($rows as $row) {
+            if (isset($skippedOrders[$row['idvisit']][$row['idorder']])) {
+                continue; // the items of a skipped order
+            }
             $row['idvisit'] = $visitorIdMap[$row['idvisit']];
             $row['idsite'] = $request->targetIdSite;
             $row['idaction_sku'] = $logActionMigration->migrateAction($row['idaction_sku'], $targetDb);
@@ -205,5 +241,29 @@ class LogMigration extends BaseMigration
     private function hasPageViewTimeTable(): bool
     {
         return DbHelper::tableExists(Common::prefixTable('log_page_view_time'));
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function moveCustomDimensionValues(string $table, string $scope, array $row, Request $request): array
+    {
+        if ($request->customDimensionIndexes === null) {
+            return $row;
+        }
+        if (!isset($this->customDimensionColumns[$table])) {
+            $columns = array_fill_keys(preg_grep('/^custom_dimension_\d+$/', array_keys($row)), null);
+            foreach ($request->customDimensionIndexes[$scope] ?? [] as $sourceIndex => $targetIndex) {
+                $columns['custom_dimension_' . $targetIndex] = 'custom_dimension_' . $sourceIndex;
+            }
+            $this->customDimensionColumns[$table] = $columns;
+        }
+
+        $values = array();
+        foreach ($this->customDimensionColumns[$table] as $column => $sourceColumn) {
+            $values[$column] = $sourceColumn === null ? null : ($row[$sourceColumn] ?? null);
+        }
+        return array_merge($row, $values);
     }
 }

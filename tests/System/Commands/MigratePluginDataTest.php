@@ -259,6 +259,60 @@ class MigratePluginDataTest extends ConsoleCommandTestCase
     }
 
 
+    public function test_existingSiteReusesPluginDefinitionsAndSegments(): void
+    {
+        $this->assertSame(0, $this->runCommand(), $this->applicationTester->getDisplay());
+        $idSite = (int) $this->fetchOne('SELECT MAX(idsite) FROM %ssite');
+        $snapshot = function () use ($idSite) {
+            $rows = [];
+            foreach (['mtest_heatmap', 'mtest_report', 'mtest_container', 'mtest_container_item'] as $table) {
+                $rows[$table] = $this->fetchAll('SELECT * FROM %s' . $table . ' WHERE idsite = ' . $idSite);
+            }
+            $rows['segments'] = $this->fetchAll('SELECT * FROM %ssegment WHERE enable_only_idsite = ' . $idSite . ' ORDER BY idsegment');
+            $rows['visits'] = $this->fetchAll('SELECT * FROM %slog_visit WHERE idsite = ' . $idSite . ' ORDER BY idvisit');
+            return $rows;
+        };
+        $before = $snapshot();
+        $this->assertSame(0, $this->runCommand(['--target-idsite' => $idSite, '--skip-logs' => true, '--skip-archives' => true]), $this->applicationTester->getDisplay());
+        $this->assertSame($before, $snapshot(), 'Reusing an existing site must not duplicate plugin configurations or segments.');
+        $this->assertStringContainsString('Migrated 0 rows of mtest_heatmap, 2 rows the existing site had already', $this->applicationTester->getDisplay());
+    }
+
+    /** @dataProvider getConflictingReportImports */
+    public function test_existingReportWithDifferentSettingsDoesNotReceiveSourceArchives(bool $skipLogs, bool $dryRun): void
+    {
+        $targetDb = self::$fixture->targetDb;
+        $site = Db::fetchRow('SELECT * FROM site WHERE idsite = 1');
+        unset($site['idsite']);
+        $site['name'] = 'Configured but empty destination';
+        $idSite = $targetDb->insert('site', $site);
+        $report = Db::fetchRow("SELECT * FROM mtest_report WHERE idsite = 1 AND name = 'Report without segment'");
+        $this->assertNotSame('[]', $report['metrics']);
+        unset($report['idreport']);
+        $report['idsite'] = $idSite;
+        $report['metrics'] = '[]';
+        $idReport = $targetDb->insert('mtest_report', $report);
+        $targetDb->createArchiveTableIfNeeded('archive_numeric_2013_01');
+        $before = $this->getTargetRowCounts();
+        $result = $this->runCommand(['--target-idsite' => $idSite, '--target-site-is-offline' => true, '--skip-logs' => $skipLogs, '--dry-run' => $dryRun]);
+        $output = preg_replace('/\s+/', ' ', $this->applicationTester->getDisplay());
+        $this->assertSame($skipLogs ? 1 : 0, $result, $output);
+        $this->assertStringContainsString('existingpremiumconfigurationdiffers', preg_replace('/\s+/', '', $output));
+        $this->assertSame('[]', $targetDb->fetchOne('SELECT metrics FROM ' . $targetDb->quoteTable('mtest_report') . ' WHERE idreport = ?', [$idReport]));
+        $this->assertEquals(0, $targetDb->fetchOne('SELECT COUNT(*) FROM ' . $targetDb->quoteTable('archive_numeric_2013_01') . ' WHERE idsite = ?', [$idSite]));
+        if ($skipLogs || $dryRun) {
+            $this->assertSame($before, $this->getTargetRowCounts());
+        } else {
+            $this->assertEquals(2, $targetDb->fetchOne('SELECT COUNT(*) FROM ' . $targetDb->quoteTable('log_visit') . ' WHERE idsite = ?', [$idSite]));
+            $this->assertStringContainsString('core:invalidate-report-data --sites=' . $idSite, $output);
+        }
+    }
+
+    public static function getConflictingReportImports(): array
+    {
+        return ['raw data' => [false, false], 'archives only' => [true, false], 'raw dry run' => [false, true], 'archives-only dry run' => [true, true]];
+    }
+
     private function assertTargetHasSameDataAsSource(int $targetIdSite): void
     {
         $source = $this->getSemanticData(self::SOURCE_PREFIX, 1);

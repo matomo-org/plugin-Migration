@@ -287,6 +287,88 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
         $this->assertSame([], $migrator->getTablesNotMigrated(1, $this->targetDb));
     }
 
+    /** @dataProvider getDimensionMetricTargets */
+    public function test_dimensionMetricsAreTranslatedBeforeReusingAlertsAndHistory(int $currentDimension, int $historicalDimension, ?string $existing, bool $dryRun): void
+    {
+        $migrator = $this->createPremiumReports();
+        $this->createPremiumAlert(1, [1]);
+        Db::get()->update(Common::prefixTable('alert'), ['metric' => 'nb_uniq_customdimension_customdimension2'], 'idalert = 1');
+        Db::get()->update(Common::prefixTable('alert_triggered'), ['metric' => 'nb_uniq_customdimension_customdimension3'], 'idalert = 1');
+        $this->request->isExistingTargetSite = true;
+        $this->request->idMaps->set(TableDefinition::CUSTOM_DIMENSION, 2, $currentDimension);
+        $this->request->idMaps->set(TableDefinition::CUSTOM_DIMENSION, 3, $historicalDimension);
+        // Reusing the reports makes their destination IDs deterministic in dry runs too.
+        foreach ([101 => 'Current report', 102 => 'Historical report'] as $id => $name) {
+            $this->targetDb->insert('mtest_alert_report', ['idreport' => $id, 'idsite' => 10, 'name' => $name]);
+        }
+        $sourceBefore = $this->allRows(false);
+        $expectedAlert = array_merge($sourceBefore['alert'][0], [
+            'idalert' => 100, 'report' => 'CustomReports_getCustomReport_idCustomReport--101',
+            'metric' => 'nb_uniq_customdimension_customdimension' . $currentDimension,
+        ]);
+        $expectedHistory = array_merge($sourceBefore['alert_triggered'][0], [
+            'idalert' => 100, 'idsite' => 10, 'report' => 'CustomReports_getCustomReport_idCustomReport--102',
+            'metric' => 'nb_uniq_customdimension_customdimension' . $historicalDimension,
+        ]);
+        unset($expectedHistory['idtriggered']);
+        if ($existing !== null) {
+            $alert = $expectedAlert;
+            $history = $expectedHistory;
+            if ($existing === 'conflicting') {
+                $alert['metric'] = 'nb_uniq_customdimension_customdimension2';
+                $history['metric'] = 'nb_uniq_customdimension_customdimension3';
+            }
+            $this->targetDb->insert('alert', $alert);
+            $this->targetDb->insert('alert_site', ['idalert' => 100, 'idsite' => 10]);
+            $this->targetDb->insert('alert_triggered', $history);
+        }
+        $targetBefore = $this->allRows(true);
+        if ($dryRun) {
+            $this->targetDb->enableDryRun();
+        }
+        $messages = [];
+        $alerts = new CustomAlertsMigration($migrator);
+        $alerts->onLog(function ($message) use (&$messages) {
+            $messages[] = $message;
+        });
+        (new Migrations())->migrate([new PluginDataMigration($migrator, true), $alerts], $this->request, $this->targetDb);
+
+        $added = $existing === 'matching' ? 0 : 1;
+        $this->assertContains('Migrated ' . $added . ' custom alerts', $messages);
+        $this->assertContains('Migrated ' . $added . ' triggered custom alerts', $messages);
+        $target = $this->allRows(true);
+        if ($dryRun) {
+            $this->assertSame($targetBefore, $target, 'Dry runs must translate references for reuse decisions without writing.');
+        } else {
+            $this->assertCount(count($targetBefore['alert']) + $added, $target['alert']);
+            $this->assertCount(count($targetBefore['alert_triggered']) + $added, $target['alert_triggered']);
+            $actualAlert = end($target['alert']);
+            $actualHistory = end($target['alert_triggered']);
+            $expectedAlert['idalert'] = $actualAlert['idalert'];
+            $expectedHistory['idalert'] = $actualAlert['idalert'];
+            unset($actualHistory['idtriggered']);
+            $this->assertEquals($expectedAlert, $actualAlert);
+            $this->assertEquals($expectedHistory, $actualHistory, 'History has its own dimension ID, independent of the current alert.');
+            if ($existing !== null) {
+                $this->assertSame($targetBefore['alert'][0], $target['alert'][0], 'The existing destination alert must remain unchanged.');
+                $this->assertSame($targetBefore['alert_triggered'][0], $target['alert_triggered'][0]);
+            }
+        }
+        $this->assertSame($sourceBefore, $this->allRows(false));
+    }
+
+    public static function getDimensionMetricTargets(): array
+    {
+        return [
+            'different current and historical dimensions' => [5, 8, null, false],
+            'identity mappings' => [2, 3, null, false],
+            'reuse translated alert and snapshot' => [5, 8, 'matching', false],
+            'source metric conflicts with destination metric' => [5, 8, 'conflicting', false],
+            'dry run reuses translated alert and snapshot' => [5, 8, 'matching', true],
+            'dry run detects different destination metric' => [5, 8, 'conflicting', true],
+        ];
+    }
+
     /** @dataProvider getUnresolvedPremiumReferences */
     public function test_unresolvedPremiumReferencesRollBackTheCombinedMigration($table, $column, $value, $skipPlugin)
     {

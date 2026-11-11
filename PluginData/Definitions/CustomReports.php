@@ -110,7 +110,7 @@ final class CustomReports
             }
             $targetName = self::pointToTargetId($name, '/^custom_metric_(\d+)$/', 'custom_metrics', $resolver);
             if ($targetName !== null) {
-                $targetNames[] = self::pointMetricToTargetIds($targetName, $resolver);
+                $targetNames[] = $resolver->resolveSiteMetric($targetName);
             }
         }
         return $targetNames === $names ? $metrics : json_encode($targetNames);
@@ -144,19 +144,8 @@ final class CustomReports
                 }
                 return $matches[0]; // the metric of another site, which has no value for the reports of the site
             }
-            return '{{site' . $idSite . '_' . self::pointMetricToTargetIds($matches[2], $resolver) . '}}';
+            return '{{site' . $idSite . '_' . $resolver->resolveSiteMetric($matches[2]) . '}}';
         }, $formula);
-    }
-
-    /**
-     * A metric about a goal, eg "goal_2_conversion", or about a custom dimension, eg
-     * "nb_uniq_customdimension_customdimension3"
-     */
-    private static function pointMetricToTargetIds(string $metric, IdResolver $resolver): string
-    {
-        // the IDs of goals and custom dimensions are always resolved, see IdResolver::resolve()
-        $metric = self::pointToTargetId($metric, '/^goal_(\d+)_/', TableDefinition::GOAL, $resolver) ?? $metric;
-        return self::pointToTargetId($metric, '/customdimension_customdimension(\d+)$/', TableDefinition::CUSTOM_DIMENSION, $resolver) ?? $metric;
     }
 
     /**
