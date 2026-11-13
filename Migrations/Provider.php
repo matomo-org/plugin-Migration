@@ -25,7 +25,7 @@ class Provider
     {
         $pluginDataMigrator = new PluginDataMigrator(PluginDefinitions::collect(), $skipPluginData);
         $migrations = [
-            new SiteMigration(!$skipArchives),
+            new SiteMigration(!$skipLogs),
             new SiteUrlMigration(),
             new SiteSettingMigration(),
             new GoalsMigration(),

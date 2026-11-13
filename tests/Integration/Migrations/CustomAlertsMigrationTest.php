@@ -247,6 +247,80 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
         $this->assertStringContainsString('metric', $errors[0]);
     }
 
+    public function test_historyLookupFailureRollsBackAndRemovesTemporaryTable(): void
+    {
+        $this->targetDb = new AlertHistoryPlanDb(['tables_prefix' => 'alerts_target_']);
+        $this->request->isExistingTargetSite = true;
+        $this->createAlert(1, [1]);
+        $this->createHistory(1, 1);
+        $before = $this->allRows(true);
+        $this->targetDb->failHistoryLookup = true;
+        try {
+            (new Migrations())->migrate([new CustomAlertsMigration()], $this->request, $this->targetDb);
+            $this->fail('Expected the simulated history lookup failure.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated history lookup failure', $exception->getMessage());
+        }
+        $this->assertSame($before, $this->allRows(true));
+        $this->assertNotNull($this->targetDb->historyLookup);
+        try {
+            $this->targetDb->fetchOne('SELECT COUNT(*) FROM ' . $this->targetDb->quoteIdentifier($this->targetDb->historyLookup));
+            $this->fail('The connection-local history lookup must be removed on failure.');
+        } catch (\Zend_Db_Statement_Exception $exception) {
+            $this->assertStringContainsString('42S02', $exception->getMessage());
+        }
+        $this->targetDb->failHistoryLookup = false;
+        (new Migrations())->migrate([new CustomAlertsMigration()], $this->request, $this->targetDb);
+        $this->assertCount(1, $this->allRows(true)['alert_triggered'], 'Retrying on the same connection must work.');
+    }
+
+    public function test_existingHistoryUsesIndexedCandidatesAndPreservesNullSnapshots(): void
+    {
+        $this->targetDb = new AlertHistoryPlanDb(['tables_prefix' => 'alerts_target_']);
+        $this->request->isExistingTargetSite = true;
+        $this->createAlert(1, [1]);
+        $this->createHistory(1, 1);
+        Db::query('UPDATE ' . Common::prefixTable('alert_triggered') . ' SET ts_last_sent = NULL, value_old = NULL');
+        // Two identical source snapshots must not become two destination rows.
+        $this->createHistory(1, 1);
+        Db::query('UPDATE ' . Common::prefixTable('alert_triggered') . ' SET ts_last_sent = NULL, value_old = NULL');
+        $unrelated = $this->historyRow($this->alertRow(900, 'Unrelated alert'), 10);
+        $this->targetDb->insert('alert_triggered', $unrelated);
+        $table = $this->targetDb->quoteTable('alert_triggered');
+        $columns = implode(', ', array_map([$this->targetDb, 'quoteIdentifier'], array_keys($unrelated)));
+        for ($i = 0; $i < 11; ++$i) {
+            $this->targetDb->getDb()->query("INSERT INTO $table ($columns) SELECT $columns FROM $table");
+        }
+        $sourceBefore = $this->allRows(false);
+        $indexesBefore = $this->targetDb->fetchAll("SHOW INDEX FROM $table");
+        $this->targetDb->beginTransaction();
+        try {
+            (new CustomAlertsMigration())->migrate($this->request, $this->targetDb);
+            $this->assertTrue($this->targetDb->getDb()->getConnection()->inTransaction(), 'Building the history lookup must not commit migration writes.');
+            (new CustomAlertsMigration())->migrate($this->request, $this->targetDb);
+            $this->assertEquals(2049, $this->targetDb->fetchOne("SELECT COUNT(*) FROM $table"));
+            $copied = $this->targetDb->fetchRow("SELECT * FROM $table WHERE idalert <> 900");
+            $this->assertNull($copied['value_old']);
+            $this->assertNull($copied['ts_last_sent']);
+            $this->assertEquals(2048, $this->targetDb->fetchOne("SELECT COUNT(*) FROM $table WHERE idalert = 900"));
+            $this->assertSame($sourceBefore, $this->allRows(false));
+            $this->assertNotEmpty($this->targetDb->plans);
+            foreach ($this->targetDb->plans as $plan) {
+                $this->assertLessThan(100, array_sum(array_column($plan, 'rows')), 'History lookup must not scan thousands of unrelated snapshots: ' . json_encode($plan));
+            }
+        } finally {
+            $this->targetDb->rollBack();
+        }
+        $this->assertEquals(2048, $this->targetDb->fetchOne("SELECT COUNT(*) FROM $table"), 'All migrated rows must roll back.');
+        // Cardinality estimates can change; compare the permanent index definitions only.
+        $indexColumns = function (array $rows): array {
+            return array_map(function (array $row): array {
+                return array_intersect_key($row, array_flip(['Key_name', 'Column_name', 'Seq_in_index', 'Non_unique']));
+            }, $rows);
+        };
+        $this->assertSame($indexColumns($indexesBefore), $indexColumns($this->targetDb->fetchAll("SHOW INDEX FROM $table")));
+    }
+
     public function test_validateStructureAcceptsMatchingTables()
     {
         $this->assertSame([], (new CustomAlertsMigration())->validateStructure($this->targetDb));
@@ -544,5 +618,27 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
             $rows[$table] = Db::fetchAll('SELECT * FROM ' . $name . ' ORDER BY ' . $order);
         }
         return $rows;
+    }
+}
+
+/** Captures the real optimizer plan while connection-local lookup tables still exist. */
+class AlertHistoryPlanDb extends TargetDb
+{
+    public $plans = [];
+    public $historyLookup;
+    public $failHistoryLookup = false;
+
+    public function fetchOne($sql, $bind = [])
+    {
+        if (strpos($sql, 'SELECT 1 FROM ' . $this->quoteTable('alert_triggered')) === 0) {
+            $this->plans[] = $this->fetchAll('EXPLAIN ' . $sql, $bind);
+            if (preg_match('/INNER JOIN `(migration_alert_history_[a-f0-9]+)`/', $sql, $matches)) {
+                $this->historyLookup = $matches[1];
+            }
+            if ($this->failHistoryLookup) {
+                throw new \RuntimeException('Simulated history lookup failure');
+            }
+        }
+        return parent::fetchOne($sql, $bind);
     }
 }

@@ -54,6 +54,11 @@ class LogMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
+        if ($request->isExistingTargetSite && $request->customDimensionIndexes === null) {
+            // No dimension migration ran (eg the source plugin is inactive). Source columns must not be
+            // interpreted as the unrelated dimensions already occupying these columns on the destination.
+            $request->customDimensionIndexes = ['visit' => [], 'action' => []];
+        }
         $dateCondition = '';
         $dateBind = [];
         if ($request->hasDateRange()) {

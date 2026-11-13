@@ -16,11 +16,11 @@ use Piwik\Plugins\Migration\TargetDb;
 class SiteMigration extends BaseMigration
 {
     /** @var bool */
-    private $withArchives;
+    private $withRawData;
 
-    public function __construct(bool $withArchives = true)
+    public function __construct(bool $withRawData = true)
     {
-        $this->withArchives = $withArchives;
+        $this->withRawData = $withRawData;
     }
 
     public function validateStructure(TargetDb $targetDb)
@@ -48,6 +48,10 @@ class SiteMigration extends BaseMigration
         $request->idMaps->set('site', $request->sourceIdSite, $request->targetIdSite);
         $this->log(sprintf('Target site is the existing site %s', $request->targetIdSite));
 
+        if (!$this->withRawData) {
+            return;
+        }
+
         // reports of periods before the creation of a site are not processed, so the site needs to be created before
         // the first migrated action
         $dateCondition = '';
@@ -57,17 +61,6 @@ class SiteMigration extends BaseMigration
             $bind = array_merge($bind, $request->getUtcDateTimeRange());
         }
         $firstAction = Db::fetchOne('SELECT MIN(visit_first_action_time) FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ?' . $dateCondition, $bind);
-        // Archived history can predate every retained visit, or have no raw visits left at all.
-        if ($this->withArchives && $request->archivesNotCopiedReason === null) {
-            /** @var \Zend_Db_Adapter_Abstract $sourceDb Migration uses the regular DB adapter, outside the tracker. */
-            $sourceDb = Db::get();
-            $sourceCreated = Db::fetchOne('SELECT ts_created FROM ' . $sourceDb->quoteIdentifier([Common::prefixTable('site')]) . ' WHERE idsite = ?', [$request->sourceIdSite]);
-            [$start, $end] = $request->getUtcDateTimeRange();
-            $archiveStart = max($sourceCreated, $start);
-            if ($archiveStart <= $end && (!$firstAction || $archiveStart < $firstAction)) {
-                $firstAction = $archiveStart;
-            }
-        }
         $targetCreated = $targetDb->fetchOne('SELECT ts_created FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', array($request->targetIdSite));
         if ($firstAction && (!$targetCreated || $firstAction < $targetCreated)) {
             $targetDb->update('site', array('ts_created' => $firstAction), array('idsite' => $request->targetIdSite));

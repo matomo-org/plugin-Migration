@@ -338,13 +338,16 @@ class Migrate extends ConsoleCommand
             return;
         }
 
+        // These options are validated website calendar dates, not UTC instants. Pass the strings to the
+        // period factory: a timezone-adjusted Date can cross a day boundary inside period generation.
+        $timezone = Site::getTimezoneFor($request->sourceIdSite);
         $earlierDay = null;
         $beforeStart = null;
         if ($request->startDate !== null) {
             [$firstDay] = $this->getDaysOfMigratedVisits($request, $targetDb);
             if ($firstDay !== null && $firstDay < $request->startDate) {
                 $earlierDay = $firstDay;
-                $beforeStart = Date::factory($request->startDate)->subDay(1)->toString();
+                $beforeStart = Date::factory($request->startDate, 'UTC')->subDay(1)->toString();
                 // Whole visits are copied, including actions before the range. Rebuild only the earlier daily
                 // reports, as invalidating copied days could discard reports whose raw data has been deleted.
                 $this->logMessage(sprintf(
@@ -366,13 +369,13 @@ class Migrate extends ConsoleCommand
         foreach (['week', 'month', 'year'] as $label) {
             $partialPeriods = [];
             if ($request->startDate !== null && $earlierDay === null) {
-                $start = PeriodFactory::build($label, $request->startDate)->getDateStart()->toString();
+                $start = PeriodFactory::build($label, $request->startDate, $timezone)->getDateStart()->toString();
                 if ($start < $request->startDate) {
                     $partialPeriods[$start] = $request->startDate;
                 }
             }
             if ($request->endDate !== null) {
-                $period = PeriodFactory::build($label, $request->endDate);
+                $period = PeriodFactory::build($label, $request->endDate, $timezone);
                 $start = $period->getDateStart()->toString();
                 if ($period->getDateEnd()->toString() > $request->endDate && ($beforeStart === null || $start > $beforeStart)) {
                     $partialPeriods[$start] = $request->endDate;

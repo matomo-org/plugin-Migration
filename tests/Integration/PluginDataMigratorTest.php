@@ -278,6 +278,56 @@ class PluginDataMigratorTest extends IntegrationTestCase
         return ['primary key' => [true, false], 'unique index' => [false, false], 'primary dry run' => [true, true], 'unique dry run' => [false, true]];
     }
 
+    /** @dataProvider getDatelessPropertyBounds */
+    public function test_datelessPropertyRowsAreIndependentOfDateBounds(?string $start, ?string $end, array $expectedDates, bool $strictSource = false): void
+    {
+        $definition = new PluginDefinition(self::PLUGIN_NAME);
+        $definition->addTable(TableDefinition::forSiteKeys('mtest_import', 'property', 'date', [$this, 'getSiteKeys']));
+        $definitions = new PluginDefinitions();
+        $definitions->add($definition);
+        $migrator = new PluginDataMigrator($definitions);
+        foreach (['0000-00-00', '2024-01-22', '2024-01-23', '2024-01-24'] as $date) {
+            Db::get()->insert(Common::prefixTable('mtest_import'), ['property' => 'https://example.com/', 'date' => $date, 'data' => 'source']);
+        }
+        Db::get()->insert(Common::prefixTable('mtest_import'), ['property' => 'https://other.example/', 'date' => '0000-00-00', 'data' => 'other site']);
+        $this->targetDb->insert('mtest_import', ['property' => 'https://example.com/', 'date' => '0000-00-00', 'data' => 'existing crawl errors']);
+        $request = new Request();
+        $request->sourceIdSite = 1;
+        $request->targetIdSite = 10;
+        $request->startDate = $start;
+        $request->endDate = $end;
+        $sqlMode = Db::fetchOne('SELECT @@SESSION.sql_mode');
+        if ($strictSource) {
+            // A source can retain zero-date rows written before NO_ZERO_DATE was enabled.
+            Db::query("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'");
+        }
+        try {
+            $migrator->migrateSiteLogData($request, $this->targetDb, new LogActionMigration());
+            $this->assertEquals($expectedDates, $this->targetDb->fetchCol('SELECT date FROM ' . $this->targetDb->quoteTable('mtest_import') . ' ORDER BY date'));
+            $this->assertSame('existing crawl errors', $this->targetDb->fetchOne('SELECT data FROM ' . $this->targetDb->quoteTable('mtest_import') . " WHERE date = '0000-00-00'"));
+            // A fresh target copies the current, dateless data for every kind of bound.
+            $this->targetDb->delete('mtest_import', ['property' => 'https://example.com/']);
+            $migrator->migrateSiteLogData($request, $this->targetDb, new LogActionMigration());
+            $this->assertEquals($expectedDates, $this->targetDb->fetchCol('SELECT date FROM ' . $this->targetDb->quoteTable('mtest_import') . ' ORDER BY date'));
+            $this->assertSame('source', $this->targetDb->fetchOne('SELECT data FROM ' . $this->targetDb->quoteTable('mtest_import') . " WHERE date = '0000-00-00'"));
+        } finally {
+            Db::query('SET SESSION sql_mode = ?', [$sqlMode]);
+        }
+    }
+
+    public static function getDatelessPropertyBounds(): array
+    {
+        return [
+            'no bound' => [null, null, ['0000-00-00', '2024-01-22', '2024-01-23', '2024-01-24']],
+            'start only' => ['2024-01-23', null, ['0000-00-00', '2024-01-23', '2024-01-24']],
+            'end only' => [null, '2024-01-23', ['0000-00-00', '2024-01-22', '2024-01-23']],
+            'both' => ['2024-01-23', '2024-01-23', ['0000-00-00', '2024-01-23']],
+            'strict start only' => ['2024-01-23', null, ['0000-00-00', '2024-01-23', '2024-01-24'], true],
+            'strict end only' => [null, '2024-01-23', ['0000-00-00', '2024-01-22', '2024-01-23'], true],
+            'strict both' => ['2024-01-23', '2024-01-23', ['0000-00-00', '2024-01-23'], true],
+        ];
+    }
+
     public function test_dateRangeFiltersSiteLogsInUtcAndPropertyDataByCalendarDay(): void
     {
         $idSite = SitesAPI::getInstance()->addSite('Source', ['https://example.com'], timezone: 'Europe/Bucharest');

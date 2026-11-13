@@ -10,6 +10,7 @@
 namespace Piwik\Plugins\Migration\Migrations;
 
 use Piwik\Common;
+use Piwik\Db;
 use Piwik\DataAccess\ArchiveTableCreator;
 use Piwik\Plugins\Migration\Db\BatchQuery;
 use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
@@ -98,6 +99,7 @@ class ArchiveMigration extends BaseMigration
         $this->log(sprintf('Found %s archive tables', count($this->archiveTables)));
 
         $sourcePrefix = Common::prefixTable('');
+        $copiedHistory = false;
 
         foreach ($this->archiveTables as $archiveTable) {
             if (!$this->isSourceArchiveTable($archiveTable, $sourcePrefix)) {
@@ -140,6 +142,7 @@ class ArchiveMigration extends BaseMigration
                         $archive['idsite']    = $request->targetIdSite;
                         try {
                             $targetDb->insert($archiveTable, $archive);
+                            $copiedHistory = true;
                         } catch (\Exception $e) {
                             if (
                                 $e->getCode() == 23000
@@ -159,7 +162,26 @@ class ArchiveMigration extends BaseMigration
             }
             $this->log('Migrated archive table ' . $archiveTable);
         }
+        if ($copiedHistory && $request->isExistingTargetSite) {
+            $this->includeArchivedHistoryInCreationDate($request, $targetDb);
+        }
         $this->idArchiveMap = array();
+    }
+
+    private function includeArchivedHistoryInCreationDate(Request $request, TargetDb $targetDb): void
+    {
+        // Premium configuration can reject archives after SiteMigration. Only backdate for archived history
+        // once reports have actually been copied, including when their raw visits have already been purged.
+        /** @var \Zend_Db_Adapter_Abstract $sourceDb Migration uses the regular DB adapter, outside the tracker. */
+        $sourceDb = Db::get();
+        $sourceCreated = Db::fetchOne('SELECT ts_created FROM ' . $sourceDb->quoteIdentifier([Common::prefixTable('site')]) . ' WHERE idsite = ?', [$request->sourceIdSite]);
+        [$start, $end] = $request->getUtcDateTimeRange();
+        $archiveStart = max($sourceCreated, $start);
+        $targetCreated = $targetDb->fetchOne('SELECT ts_created FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$request->targetIdSite]);
+        if ($archiveStart <= $end && (!$targetCreated || $archiveStart < $targetCreated)) {
+            $targetDb->update('site', ['ts_created' => $archiveStart], ['idsite' => $request->targetIdSite]);
+            $this->log(sprintf('Changed the creation date of the target site to %s to include migrated history', $archiveStart));
+        }
     }
 
     private function checkReportsCanBeRebuilt(Request $request): void

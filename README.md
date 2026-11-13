@@ -92,6 +92,10 @@ and its creation date is moved earlier when needed for the imported history. Exi
 Matching goals, custom dimensions, segments, alerts and premium configuration are reused; missing definitions are
 added. Custom dimensions match by name and scope; premium definitions use the identity columns declared by each
 plugin definition. Existing configuration takes precedence when those identities match.
+When CustomDimensions is inactive on the source, imported log dimension columns are cleared so their values cannot
+appear under unrelated destination dimensions. Existing destination values and definitions are kept.
+Alert-history deduplication uses a connection-local indexed lookup and requires `CREATE TEMPORARY TABLES` on the
+destination database. The lookup is removed after use, including on failure; permanent CustomAlerts indexes are unchanged.
 Children of reused premium definitions must also match: for example, the migration stops if a source funnel has a
 step missing from its matching destination funnel, instead of changing the destination funnel. Extra destination
 children are preserved, but make source reports incompatible with that configuration.
@@ -138,6 +142,8 @@ or reports.
 ### Selecting dates
 
 `--start-date` and `--end-date` accept inclusive calendar dates in `YYYY-MM-DD` format. Either bound may be omitted.
+Dateless property data, such as Bing's current crawl errors stored under `0000-00-00`, is copied with either or both
+bounds. Existing destination property rows with the same key are preserved.
 For example, add `--target-idsite=7 --end-date=2024-12-31` to import historical data before tracking began on the
 destination on 1 January 2025, provided there is no earlier overlap.
 
@@ -247,3 +253,17 @@ transforms and report-ID rewrites without a database or licensed plugins, so thi
 and compares real data through the installed premium plugins; it skips when none are installed. To require all
 12 supported premium plugins in a licensed test installation, set `MIGRATION_REQUIRE_PREMIUM_PLUGINS=1` when
 running the suite. Premium packages and license keys must not be included in this repository.
+
+The timezone CI job runs the focused `MigrationTimezone` cases with the database server in
+`Pacific/Auckland`, on MySQL and MariaDB. It verifies the actual server offset before testing site-day
+boundaries, daylight-saving changes, imported visits and report-rebuilding commands.
+To reproduce it locally with Bash, Git and Docker available, run from this plugin's directory:
+
+```bash
+bash tests/ci/run-timezone-suite.sh
+MIGRATION_TIMEZONE_DB_IMAGE=mariadb:10.6 bash tests/ci/run-timezone-suite.sh
+```
+
+The runner builds a disposable PHP/Matomo environment from `6.x-dev` and removes its containers and network
+afterward. It uses no premium packages or existing database volumes. Set `MIGRATION_TIMEZONE_MATOMO_REF`
+to a Matomo branch, tag or commit to check another supported version.

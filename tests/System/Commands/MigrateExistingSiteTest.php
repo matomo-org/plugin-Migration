@@ -243,7 +243,10 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
         $this->assertEquals(4, $db->fetchOne('SELECT COUNT(*) FROM ' . $targetDb->prefixTable('goal') . ' WHERE idsite = ?', [$idSite]));
     }
 
-    /** @dataProvider getVisitsCrossingTheStartDate */
+    /**
+     * @group MigrationTimezone
+     * @dataProvider getVisitsCrossingTheStartDate
+     */
     public function test_runMigration_dateRange_rebuildsTheEarlierDayOfAVisit(string $timezone, string $firstAction, string $lastAction)
     {
         FakeAccess::clearAccess(true);
@@ -342,6 +345,7 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
         ];
     }
 
+    /** @group MigrationTimezone */
     public function test_runMigration_dateRange_usesTheTimezoneOfTheSite()
     {
         // the visits are tracked at 2013-01-23 01:29 UTC and later, which is 2013-01-22 in New York
@@ -737,6 +741,141 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
         $this->assertSame($before, $this->getTargetSiteCounts($idSite));
         $this->assertSame(0, $this->runCommand(['--target-idsite' => $idSite, '--skip-logs' => true, '--skip-archives' => true]));
         $this->assertSame(1, $this->getTargetSiteCounts($idSite)['visits']);
+    }
+
+    /**
+     * @group MigrationTimezone
+     * @dataProvider getWebsiteCalendarRanges
+     */
+    public function test_dateRangeGuidanceAndUtcBoundsUseWebsiteTimezone(string $timezone, string $start, string $end, array $utcRange, array $commands): void
+    {
+        FakeAccess::clearAccess(true);
+        Db::query('UPDATE site SET timezone = ? WHERE idsite = 1', [$timezone]);
+        Site::clearCache();
+        try {
+            $request = new Request();
+            $request->sourceIdSite = 1;
+            $request->startDate = $start;
+            $request->endDate = $end;
+            $this->assertSame($utcRange, $request->getUtcDateTimeRange());
+            $this->assertSame(0, $this->runCommand(['--start-date' => $start, '--end-date' => $end, '--dry-run' => true]), $this->applicationTester->getDisplay());
+            $output = preg_replace('/\s+/', ' ', $this->applicationTester->getDisplay());
+            preg_match_all('/core:invalidate-report-data --sites=\d+ --dates=([\d,-]+) --periods=([a-z,]+)/', $output, $matches, PREG_SET_ORDER);
+            $actual = array_map(function (array $match): array {
+                return [$match[1], $match[2]];
+            }, $matches);
+            $this->assertSame($commands, $actual, $output);
+        } finally {
+            Db::query("UPDATE site SET timezone = 'UTC' WHERE idsite = 1");
+            Site::clearCache();
+        }
+    }
+
+    public static function getWebsiteCalendarRanges(): array
+    {
+        return [
+            'west of UTC complete week' => ['America/New_York', '2024-01-01', '2024-01-07', ['2024-01-01 05:00:00', '2024-01-08 04:59:59'], [['2024-01-07', 'month,year']]],
+            'east of UTC complete week' => ['Pacific/Auckland', '2024-01-01', '2024-01-07', ['2023-12-31 11:00:00', '2024-01-07 10:59:59'], [['2024-01-07', 'month,year']]],
+            'US spring 23 hour day' => ['America/New_York', '2024-03-10', '2024-03-10', ['2024-03-10 05:00:00', '2024-03-11 03:59:59'], [['2024-03-10', 'week,month,year']]],
+            'US autumn 25 hour day' => ['America/New_York', '2024-11-03', '2024-11-03', ['2024-11-03 04:00:00', '2024-11-04 04:59:59'], [['2024-11-03', 'week,month,year']]],
+            'NZ spring 23 hour day' => ['Pacific/Auckland', '2024-09-29', '2024-09-29', ['2024-09-28 12:00:00', '2024-09-29 10:59:59'], [['2024-09-29', 'week,month,year']]],
+            'NZ autumn 25 hour day' => ['Pacific/Auckland', '2024-04-07', '2024-04-07', ['2024-04-06 11:00:00', '2024-04-07 11:59:59'], [['2024-04-07', 'week,month,year']]],
+        ];
+    }
+
+    /**
+     * @group MigrationTimezone
+     * @dataProvider getWebsiteLogRanges
+     */
+    public function test_dateRangeImportsOnlyVisitsInsideWebsiteCalendarBounds(string $timezone, string $start, string $end, array $utcRange): void
+    {
+        FakeAccess::clearAccess(true);
+        $sourceId = MigrationFixture::createWebsite('2020-01-01', 0, 'Calendar boundaries', false, 1, null, null, $timezone);
+        $targetId = $this->createTargetSite('Calendar boundaries target', $timezone);
+        $visit = Db::fetchRow('SELECT * FROM log_visit WHERE idsite = 1 LIMIT 1');
+        unset($visit['idvisit']);
+        $visit['idsite'] = $sourceId;
+        $utc = new \DateTimeZone('UTC');
+        $before = (new \DateTimeImmutable($utcRange[0], $utc))->modify('-1 second')->format('Y-m-d H:i:s');
+        $after = (new \DateTimeImmutable($utcRange[1], $utc))->modify('+1 second')->format('Y-m-d H:i:s');
+        foreach ([$before, $utcRange[0], $utcRange[1], $after] as $time) {
+            Db::get()->insert('log_visit', array_merge($visit, ['visit_first_action_time' => $time, 'visit_last_action_time' => $time]));
+        }
+        $options = ['--source-idsite' => $sourceId, '--target-idsite' => $targetId, '--start-date' => $start, '--end-date' => $end, '--skip-archives' => true];
+        $targetDb = self::$fixture->targetDb;
+        $query = 'SELECT visit_last_action_time FROM ' . $targetDb->quoteTable('log_visit') . ' WHERE idsite = ? ORDER BY visit_last_action_time';
+        $this->assertSame(0, $this->runCommand(array_merge($options, ['--dry-run' => true])), $this->applicationTester->getDisplay());
+        $this->assertSame([], $targetDb->getDb()->fetchCol($query, [$targetId]));
+        $this->assertSame(0, $this->runCommand($options), $this->applicationTester->getDisplay());
+        $this->assertSame($utcRange, $targetDb->getDb()->fetchCol($query, [$targetId]));
+        $this->assertSame([$before, $utcRange[0], $utcRange[1], $after], Db::get()->fetchCol(
+            'SELECT visit_last_action_time FROM log_visit WHERE idsite = ? ORDER BY visit_last_action_time',
+            [$sourceId]
+        ));
+    }
+
+    public static function getWebsiteLogRanges(): array
+    {
+        return array_map(function (array $range): array {
+            return array_slice($range, 0, 4);
+        }, self::getWebsiteCalendarRanges());
+    }
+
+    public function test_inactiveCustomDimensionsClearsImportedValuesForExistingSite(): void
+    {
+        $targetDb = self::$fixture->targetDb;
+        $idSite = $this->createTargetSite('Destination dimensions', 'UTC');
+        foreach (['visit', 'action'] as $id => $scope) {
+            $targetDb->insert('custom_dimensions', [
+                'idcustomdimension' => $id + 1, 'idsite' => $idSite, 'name' => 'Destination ' . $scope,
+                'index' => 1, 'scope' => $scope, 'active' => 1, 'extractions' => '[]', 'case_sensitive' => 1,
+            ]);
+        }
+        $dimensionsBefore = $targetDb->fetchAll('SELECT * FROM ' . $targetDb->quoteTable('custom_dimensions') . ' WHERE idsite = ?', [$idSite]);
+        $tables = ['log_visit', 'log_conversion', 'log_link_visit_action'];
+        foreach ($tables as $table) {
+            Db::query("UPDATE $table SET custom_dimension_1 = 'source value' WHERE idsite = 1");
+        }
+        $visit = Db::fetchRow('SELECT * FROM log_visit WHERE idsite = 1 LIMIT 1');
+        unset($visit['idvisit']);
+        $visit['idsite'] = $idSite;
+        $visit['custom_dimension_1'] = 'destination value';
+        $existingVisitId = $targetDb->insert('log_visit', $visit);
+        $manager = \Piwik\Plugin\Manager::getInstance();
+        $manager->deactivatePlugin('CustomDimensions');
+        try {
+            $this->assertFalse($manager->isPluginActivated('CustomDimensions'));
+            $request = new Request();
+            $request->sourceIdSite = 1;
+            $request->targetIdSite = $idSite;
+            $request->isExistingTargetSite = true;
+            $migrations = (new \Piwik\Plugins\Migration\Migrations\Provider())->getAllMigrations(false, true);
+            $this->assertNotContains(\Piwik\Plugins\Migration\Migrations\CustomDimensionMigration::class, array_map('get_class', $migrations));
+            (new \Piwik\Plugins\Migration\Migrations())->migrate($migrations, $request, $targetDb);
+            foreach ($tables as $table) {
+                $where = ' WHERE idsite = ?' . ($table === 'log_visit' ? ' AND idvisit <> ' . (int) $existingVisitId : '');
+                $rows = $targetDb->fetchAll('SELECT custom_dimension_1 FROM ' . $targetDb->quoteTable($table) . $where, [$idSite]);
+                $this->assertNotEmpty($rows, $table);
+                $this->assertSame(array_fill(0, count($rows), ['custom_dimension_1' => null]), $rows, $table);
+                $this->assertEquals(['source value'], Db::get()->fetchCol("SELECT DISTINCT custom_dimension_1 FROM $table WHERE idsite = 1"));
+            }
+            $this->assertSame('destination value', $targetDb->fetchOne('SELECT custom_dimension_1 FROM ' . $targetDb->quoteTable('log_visit') . ' WHERE idvisit = ?', [$existingVisitId]));
+            $this->assertSame($dimensionsBefore, $targetDb->fetchAll('SELECT * FROM ' . $targetDb->quoteTable('custom_dimensions') . ' WHERE idsite = ?', [$idSite]));
+        } finally {
+            $manager->activatePlugin('CustomDimensions');
+            foreach ($tables as $table) {
+                Db::query("UPDATE $table SET custom_dimension_1 = NULL WHERE idsite = 1");
+            }
+        }
+    }
+
+    public function test_configurationOnlyImportDoesNotBackdateExistingSite(): void
+    {
+        $idSite = $this->createTargetSite('Configuration only', 'UTC');
+        $this->assertSame(0, $this->runCommand(['--target-idsite' => $idSite, '--skip-logs' => true, '--skip-archives' => true]), $this->applicationTester->getDisplay());
+        $targetDb = self::$fixture->targetDb;
+        $this->assertSame('2020-01-01 00:00:00', $targetDb->fetchOne('SELECT ts_created FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$idSite]));
+        $this->assertEquals(0, $targetDb->fetchOne('SELECT COUNT(*) FROM ' . $targetDb->quoteTable('log_visit') . ' WHERE idsite = ?', [$idSite]));
     }
 
     public function test_runMigration_targetIdSite_givesGoalsAndDimensionsTheIdsTheyHaveOnTheExistingSite()

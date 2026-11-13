@@ -975,11 +975,19 @@ class PluginDataMigrator
             do {
                 $sql = sprintf('SELECT * FROM %s WHERE %s', $sourceTable, $where);
                 $bind = [$key];
+                $dateConditions = [];
+                $dateColumn = $this->quoteIdentifier((string) $tableDefinition->getDateColumn());
                 foreach (['>=' => $request->startDate, '<=' => $request->endDate] as $operator => $date) {
                     if ($date !== null) {
-                        $sql .= sprintf(' AND %s %s ?', $this->quoteIdentifier((string) $tableDefinition->getDateColumn()), $operator);
+                        $dateConditions[] = sprintf('%s %s ?', $dateColumn, $operator);
                         $bind[] = $date;
                     }
+                }
+                if ($dateConditions !== []) {
+                    // Current property data (eg Bing crawl errors) has no reporting day. Keep it regardless of
+                    // which bound was supplied; the ordinary primary-key check still preserves destination rows.
+                    // Numeric zero also works when MySQL rejects a zero-date string under NO_ZERO_DATE.
+                    $sql .= sprintf(' AND ((%s) OR %s = 0)', implode(' AND ', $dateConditions), $dateColumn);
                 }
                 if ($lastRow !== null) {
                     $sql .= sprintf(' AND (%s) > (%s)', $pageColumnList, Common::getSqlStringFieldsArray($pageColumns));
