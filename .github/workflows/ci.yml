@@ -22,3 +22,15 @@ jobs:
     with:
       plugin-name: Migration
       verify-hook: true
+
+  timezone:
+    strategy:
+      fail-fast: false
+      matrix:
+        database: ['mysql:8.0', 'mariadb:10.6']
+    uses: matomo-org/plugin-ci-workflows/.github/workflows/plugin-timezone-safety.yml@main
+    with:
+      plugin-name: Migration
+      # Plugins CI already runs the static scan; this job runs the regression cases.
+      skip-static-scan: true
+      timezone-test-command: MIGRATION_TIMEZONE_DB_IMAGE=${{ matrix.database }} bash tests/ci/run-timezone-suite.sh
