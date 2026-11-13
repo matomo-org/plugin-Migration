@@ -101,6 +101,26 @@ final class IdResolver
     }
 
     /**
+     * Translates site-local IDs in goal and custom-dimension metrics. Other metrics are kept.
+     */
+    public function resolveSiteMetric(string $metric): string
+    {
+        foreach (
+            [
+            TableDefinition::GOAL => '/^goal_(\d+)_/',
+            TableDefinition::CUSTOM_DIMENSION => '/customdimension_customdimension(\d+)$/',
+            ] as $table => $pattern
+        ) {
+            if (preg_match($pattern, $metric, $matches, PREG_OFFSET_CAPTURE)) {
+                [$sourceId, $offset] = $matches[1];
+                // Site-local IDs retain their value when there is no explicit mapping, see resolve().
+                $metric = substr_replace($metric, (string) $this->resolve($table, $sourceId), $offset, strlen($sourceId));
+            }
+        }
+        return $metric;
+    }
+
+    /**
      * Translates the ID of a reporting page, eg the subcategory "3" of the category "Goals_Goals" is the page of the
      * goal 3, see PluginDefinition::identifiesSubcategoriesBy(). Other subcategories are kept.
      *

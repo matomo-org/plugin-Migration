@@ -153,6 +153,62 @@ class MigrateFailureTest extends ConsoleCommandTestCase
         $this->assertSame($sequences, Db::fetchAll('SELECT * FROM ' . self::PREFIX . 'sequence'));
     }
 
+    public function test_existingSiteDryRunDoesNotChangeAnyRows(): void
+    {
+        $before = $this->targetRows();
+        $source = $this->sourceRows();
+        $tables = $this->targetTables();
+        $this->assertSame(0, $this->runCommand(['--target-idsite' => 1000, '--dry-run' => true]), $this->applicationTester->getDisplay());
+        $this->assertTargetUnchanged($before);
+        $this->assertSame($tables, $this->targetTables());
+        $this->assertSame($source, $this->sourceRows());
+    }
+
+    /** @dataProvider getExistingSiteFailureKinds */
+    public function test_populatedExistingSiteRollsBackAndCanBeRetried(bool $throwError): void
+    {
+        $visit = Db::fetchRow('SELECT * FROM log_visit WHERE idsite = 1 LIMIT 1');
+        unset($visit['idvisit']);
+        $visit['idsite'] = 1000;
+        Db::get()->insert(self::PREFIX . 'log_visit', $visit);
+        $before = $this->targetRows();
+        $source = $this->sourceRows();
+        $command = new class extends Migrate {
+            public bool $throwError;
+            public function logMessage($message)
+            {
+                parent::logMessage($message);
+                if ($message === 'Processed LogMigration') {
+                    if ($this->throwError) {
+                        throw new \Error('Injected existing-site failure');
+                    }
+                    throw new \RuntimeException('Injected existing-site failure');
+                }
+            }
+        };
+        $command->throwError = $throwError;
+        $this->application->add($command);
+        try {
+            $this->assertSame(1, $this->runCommand(['--target-idsite' => 1000]));
+            $this->assertStringContainsString('Injected existing-site failure', $this->applicationTester->getDisplay());
+        } catch (\Error $error) {
+            $this->assertTrue($throwError);
+            $this->assertSame('Injected existing-site failure', $error->getMessage());
+        }
+        $this->assertTargetUnchanged($before);
+        $this->assertSame($source, $this->sourceRows());
+        $this->application->add(new Migrate());
+        $this->assertSame(0, $this->runCommand(['--target-idsite' => 1000]), $this->applicationTester->getDisplay());
+        $this->assertEquals(1, Db::fetchOne('SELECT COUNT(*) FROM ' . self::PREFIX . 'site'));
+        $this->assertEquals(3, Db::fetchOne('SELECT COUNT(*) FROM ' . self::PREFIX . 'log_visit WHERE idsite = 1000'));
+        $this->assertSame($source, $this->sourceRows());
+    }
+
+    public static function getExistingSiteFailureKinds(): array
+    {
+        return [[false], [true]];
+    }
+
     public function test_skipArchivesDoesNotPrepareArchiveTables(): void
     {
         $tables = $this->targetTables();

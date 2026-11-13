@@ -208,7 +208,7 @@ final class TableDefinition
      *
      * @param string $table unprefixed table name
      * @param string $keyColumn the column holding the key, eg the URL of a property
-     * @param string $dateColumn the column holding the day of a row, rows of the day 0000-00-00 have no date
+     * @param string $dateColumn the column holding the day of a row; dateless 0000-00-00 rows are copied regardless of date bounds
      * @param callable(int): string[] $getSiteKeys returns the keys a site of the source is configured with
      */
     public static function forSiteKeys(string $table, string $keyColumn, string $dateColumn, callable $getSiteKeys): self

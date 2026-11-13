@@ -23,12 +23,13 @@ class Provider
      */
     public function getAllMigrations($skipLogs, $skipArchives, array $skipPluginData = [])
     {
+        $pluginDataMigrator = new PluginDataMigrator(PluginDefinitions::collect(), $skipPluginData);
         $migrations = [
-            new SiteMigration(),
+            new SiteMigration(!$skipLogs),
             new SiteUrlMigration(),
             new SiteSettingMigration(),
             new GoalsMigration(),
-            new SegmentsMigration(),
+            new SegmentsMigration($pluginDataMigrator),
             new AnnotationsMigration()
         ];
 
@@ -40,7 +41,6 @@ class Provider
             $migrations[] = new CustomDimensionMigration();
         }
 
-        $pluginDataMigrator = new PluginDataMigrator(PluginDefinitions::collect(), $skipPluginData);
         $migrations[] = new PluginDataMigration($pluginDataMigrator, !$skipLogs);
 
         if (
@@ -55,7 +55,7 @@ class Provider
         }
 
         if (!$skipArchives) {
-            $migrations[] = new ArchiveMigration($pluginDataMigrator);
+            $migrations[] = new ArchiveMigration($pluginDataMigrator, !$skipLogs);
         }
 
         return $migrations;

@@ -1,6 +1,8 @@
 ## Changelog
 
 ### 6.1.0
+- Add `--target-idsite` to import into an existing destination website, preserving its configuration and remapping conflicting goal and custom-dimension IDs throughout logs, reports and alerts; copying archives into a compatible empty existing website requires paused destination tracking and archiving confirmed with `--target-site-is-offline`
+- Add inclusive `--start-date` and `--end-date` limits, with retention-aware guidance for rebuilding reports from imported data
 - Added migration of premium-plugin data for a website, including plugin configuration, raw data and references in historical reports, with validation of encrypted search-engine settings, roll-up mappings scoped to source database endpoints, and custom-metric name and cross-site reference handling
 - Translate premium-report references and custom-metric IDs in custom alerts and triggered history after migrating plugin data
 - Prepare destination archive tables before copying data so later failures can roll back the migration

@@ -32,7 +32,7 @@ class RollUpReportingTest extends IntegrationTestCase
     private const TARGET_PREFIX = 'migration_rollup_target_';
     private const OTHER_PREFIX = 'migration_rollup_other_';
 
-    private TargetDb $targetDb;
+    private ?TargetDb $targetDb = null;
     private string $originalPrefix;
     private string $originalDatabase;
     private ?string $otherDatabase = null;
@@ -62,14 +62,21 @@ class RollUpReportingTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        $this->restoreSource();
-        foreach (array_reverse($this->createdTables) as $table) {
-            Db::query("DROP TABLE IF EXISTS `$table`");
+        try {
+            $this->restoreSource();
+            foreach (array_reverse($this->createdTables) as $table) {
+                Db::query("DROP TABLE IF EXISTS `$table`");
+            }
+            if ($this->otherDatabase !== null) {
+                Db::query("DROP DATABASE `{$this->otherDatabase}`");
+            }
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
         }
-        if ($this->otherDatabase !== null) {
-            Db::query("DROP DATABASE `{$this->otherDatabase}`");
-        }
-        parent::tearDown();
     }
 
     /**

@@ -15,6 +15,14 @@ use Piwik\Plugins\Migration\TargetDb;
 
 class SiteMigration extends BaseMigration
 {
+    /** @var bool */
+    private $withRawData;
+
+    public function __construct(bool $withRawData = true)
+    {
+        $this->withRawData = $withRawData;
+    }
+
     public function validateStructure(TargetDb $targetDb)
     {
         return $this->checkTablesHaveSameStructure($targetDb, 'site');
@@ -22,11 +30,41 @@ class SiteMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
+        if ($request->isExistingTargetSite) {
+            $this->migrateIntoExistingSite($request, $targetDb);
+            return;
+        }
+
         $row = Db::fetchRow('SELECT * FROM ' . Common::prefixTable('site') . ' WHERE idsite = ?', array($request->sourceIdSite));
         unset($row['idsite']);
         $request->targetIdSite = $targetDb->insert('site', $row);
         $request->idMaps->set('site', $request->sourceIdSite, $request->targetIdSite);
 
         $this->log(sprintf('Target site is %s', $request->targetIdSite));
+    }
+
+    private function migrateIntoExistingSite(Request $request, TargetDb $targetDb): void
+    {
+        $request->idMaps->set('site', $request->sourceIdSite, $request->targetIdSite);
+        $this->log(sprintf('Target site is the existing site %s', $request->targetIdSite));
+
+        if (!$this->withRawData) {
+            return;
+        }
+
+        // reports of periods before the creation of a site are not processed, so the site needs to be created before
+        // the first migrated action
+        $dateCondition = '';
+        $bind = array($request->sourceIdSite);
+        if ($request->hasDateRange()) {
+            $dateCondition = ' AND visit_last_action_time BETWEEN ? AND ?';
+            $bind = array_merge($bind, $request->getUtcDateTimeRange());
+        }
+        $firstAction = Db::fetchOne('SELECT MIN(visit_first_action_time) FROM ' . Common::prefixTable('log_visit') . ' WHERE idsite = ?' . $dateCondition, $bind);
+        $targetCreated = $targetDb->fetchOne('SELECT ts_created FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', array($request->targetIdSite));
+        if ($firstAction && (!$targetCreated || $firstAction < $targetCreated)) {
+            $targetDb->update('site', array('ts_created' => $firstAction), array('idsite' => $request->targetIdSite));
+            $this->log(sprintf('Changed the creation date of the target site to %s to include migrated history', $firstAction));
+        }
     }
 }

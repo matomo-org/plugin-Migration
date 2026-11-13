@@ -354,6 +354,152 @@ class MigratePremiumPluginsTest extends ConsoleCommandTestCase
         }
     }
 
+    public function test_existingSiteAlertDimensionMetricsMatchTheLicensedCustomReport(): void
+    {
+        if (!PremiumPluginsFixture::isPluginActivated('CustomReports')) {
+            $this->markTestSkipped('CustomReports is required for this combined integration test.');
+        }
+        $targetDb = self::$fixture->targetDb;
+        $sourceSite = self::$fixture->idSite;
+        $site = Db::fetchRow('SELECT * FROM site WHERE idsite = ?', [$sourceSite]);
+        unset($site['idsite']);
+        $targetSite = $targetDb->insert('site', $site);
+        $dimension = Db::fetchRow('SELECT * FROM custom_dimensions WHERE idsite = ? AND idcustomdimension = 1', [$sourceSite]);
+        $targetDb->insert('custom_dimensions', array_merge($dimension, ['idsite' => $targetSite, 'name' => 'Occupied visit dimension']));
+
+        // PremiumPluginsFixture creates this report through CustomReports.addCustomReport,
+        // so its custom-dimension metric has been accepted by the licensed plugin API.
+        $sourceReport = Db::fetchRow('SELECT * FROM custom_reports WHERE idsite = ? AND name = ?', [$sourceSite, 'Converting names']);
+        $sourceMetric = 'nb_uniq_customdimension_customdimension1';
+        $this->assertContains($sourceMetric, json_decode($sourceReport['metrics'], true));
+        $sourceAlertId = (int) Db::fetchOne('SELECT COALESCE(MAX(idalert), 0) FROM alert') + 1;
+        $alert = [
+            'idalert' => $sourceAlertId, 'name' => 'Dimension metric alert', 'login' => 'alert_owner', 'period' => 'day',
+            'report' => 'CustomReports_getCustomReport_idCustomReport--' . $sourceReport['idcustomreport'], 'metric' => $sourceMetric,
+            'metric_condition' => 'less_than', 'metric_matched' => 5, 'compared_to' => 7, 'email_me' => 0,
+        ];
+        Db::get()->insert(Common::prefixTable('alert'), $alert);
+        Db::get()->insert(Common::prefixTable('alert_site'), ['idalert' => $sourceAlertId, 'idsite' => $sourceSite]);
+        Db::get()->insert(Common::prefixTable('alert_triggered'), array_merge($alert, [
+            'idsite' => $sourceSite, 'ts_triggered' => '2013-01-24 00:00:00', 'ts_last_sent' => '2013-01-24 01:00:00',
+            'name' => 'Historical dimension metric alert', 'value_old' => '10', 'value_new' => '1',
+        ]));
+        try {
+            $options = ['--target-idsite' => $targetSite, '--skip-logs' => true, '--skip-archives' => true];
+            $this->assertSame(0, $this->runCommand($options), $this->applicationTester->getDisplay());
+            $targetDimension = (int) $targetDb->fetchOne('SELECT idcustomdimension FROM ' . $targetDb->quoteTable('custom_dimensions') . ' WHERE idsite = ? AND name = ?', [$targetSite, $dimension['name']]);
+            $this->assertGreaterThan(1, $targetDimension, 'The occupied source ID must force a dimension remapping.');
+            $targetReport = $targetDb->fetchRow('SELECT * FROM ' . $targetDb->quoteTable('custom_reports') . ' WHERE idsite = ? AND name = ?', [$targetSite, $sourceReport['name']]);
+            $targetMetric = 'nb_uniq_customdimension_customdimension' . $targetDimension;
+            $this->assertContains($targetMetric, json_decode($targetReport['metrics'], true));
+            $targetAlert = $targetDb->fetchRow('SELECT a.* FROM ' . $targetDb->quoteTable('alert') . ' a JOIN ' . $targetDb->quoteTable('alert_site') . ' s ON s.idalert = a.idalert WHERE s.idsite = ? AND a.name = ?', [$targetSite, $alert['name']]);
+            $history = $targetDb->fetchAll('SELECT * FROM ' . $targetDb->quoteTable('alert_triggered') . ' WHERE idsite = ? AND idalert = ?', [$targetSite, $targetAlert['idalert']]);
+            $this->assertSame($targetMetric, $targetAlert['metric']);
+            $this->assertSame('CustomReports_getCustomReport_idCustomReport--' . $targetReport['idcustomreport'], $targetAlert['report']);
+            $this->assertCount(1, $history);
+            $this->assertSame($targetAlert['report'], $history[0]['report']);
+            $this->assertSame($targetMetric, $history[0]['metric']);
+
+            $this->assertSame(0, $this->runCommand($options), $this->applicationTester->getDisplay());
+            $this->assertStringContainsString('Migrated 0 custom alerts', $this->applicationTester->getDisplay());
+            $this->assertStringContainsString('Migrated 0 triggered custom alerts', $this->applicationTester->getDisplay());
+            $this->assertSame($history, $targetDb->fetchAll('SELECT * FROM ' . $targetDb->quoteTable('alert_triggered') . ' WHERE idsite = ? AND idalert = ?', [$targetSite, $targetAlert['idalert']]));
+            $this->assertSame($sourceMetric, Db::fetchOne('SELECT metric FROM alert WHERE idalert = ?', [$sourceAlertId]));
+            $this->assertSame($sourceMetric, Db::fetchOne('SELECT metric FROM alert_triggered WHERE idalert = ?', [$sourceAlertId]));
+        } finally {
+            foreach (['alert_triggered', 'alert_site', 'alert'] as $table) {
+                Db::query('DELETE FROM ' . Db::get()->quoteIdentifier([Common::prefixTable($table)]) . ' WHERE idalert = ?', [$sourceAlertId]);
+            }
+        }
+    }
+
+    public function test_existingSiteReusesPremiumConfigurationWithoutChangingItsData(): void
+    {
+        $this->assertSame(0, $this->runCommand(), $this->applicationTester->getDisplay());
+        $idSite = $this->getMaxTargetIdSite();
+        $snapshot = function () {
+            $tables = [];
+            foreach (Db::get()->fetchCol('SHOW TABLES') as $table) {
+                if (strpos($table, self::TARGET_PREFIX) !== 0) {
+                    continue;
+                }
+                $rows = Db::fetchAll('SELECT * FROM ' . Db::get()->quoteIdentifier([$table]));
+                sort($rows);
+                $tables[$table] = $rows;
+            }
+            ksort($tables);
+            return $tables;
+        };
+        $before = $snapshot();
+        $this->assertSame(0, $this->runCommand(['--target-idsite' => $idSite, '--skip-logs' => true, '--skip-archives' => true]), $this->applicationTester->getDisplay());
+        $this->assertSame($before, $snapshot(), 'An import of the same configuration must reuse premium IDs and preserve existing raw data and reports.');
+
+        if (PremiumPluginsFixture::isPluginActivated('Funnels')) {
+            $funnel = Db::fetchRow('SELECT * FROM funnel WHERE idsite = ? AND name = ?', [self::$fixture->idSite, 'Sub page to download']);
+            $steps = Db::fetchAll('SELECT * FROM funnel_steps WHERE idfunnel = ? ORDER BY position', [$funnel['idfunnel']]);
+            $changedSteps = $steps;
+            $changedSteps[] = ['name' => 'Extra source step', 'pattern' => '/extra', 'pattern_type' => 'path_equals', 'required' => 1];
+            $goal = Db::fetchRow('SELECT * FROM goal WHERE idsite = ? ORDER BY idgoal LIMIT 1', [self::$fixture->idSite]);
+            $goal['idgoal'] = (int) Db::fetchOne('SELECT MAX(idgoal) FROM goal WHERE idsite = ?', [self::$fixture->idSite]) + 1;
+            $goal['name'] = 'Must roll back after funnel conflict';
+            try {
+                // The licensed DAO updates child membership without changing the parent's identity or revision.
+                (new \Piwik\Plugins\Funnels\Dao\Funnel())->updateFunnel($funnel['idfunnel'], $funnel['activated'], $changedSteps);
+                $this->assertSame($funnel, Db::fetchRow('SELECT * FROM funnel WHERE idfunnel = ?', [$funnel['idfunnel']]));
+                // Goals are copied before premium data, so this row must be rolled back when the funnel fails.
+                Db::get()->insert(Common::prefixTable('goal'), $goal);
+                $this->assertNotSame(0, $this->runCommand(['--target-idsite' => $idSite, '--skip-logs' => true, '--skip-archives' => true]));
+                $expectedError = 'Cannot migrate funnel_steps: a source child has no matching row under existing destination funnel ID';
+                // Symfony may wrap within a word, so compare the message independently of console width.
+                $this->assertStringContainsString(
+                    preg_replace('/\s+/', '', $expectedError),
+                    preg_replace('/\s+/', '', $this->applicationTester->getDisplay())
+                );
+                $this->assertSame($before, $snapshot(), 'A child conflict must preserve every destination row, including rolling back the new goal.');
+            } finally {
+                Db::query('DELETE FROM goal WHERE idsite = ? AND idgoal = ?', [self::$fixture->idSite, $goal['idgoal']]);
+                Db::query('DELETE FROM funnel_steps WHERE idfunnel = ?', [$funnel['idfunnel']]);
+                foreach ($steps as $step) {
+                    Db::get()->insert(Common::prefixTable('funnel_steps'), $step);
+                }
+            }
+        }
+    }
+
+    public function test_populatedExistingSiteImportsPremiumRawDataWithADateLimit(): void
+    {
+        $targetDb = self::$fixture->targetDb;
+        $site = Db::fetchRow('SELECT * FROM site WHERE idsite = ?', [self::$fixture->idSite]);
+        unset($site['idsite']);
+        $site['name'] = 'Destination already tracking';
+        $idSite = $targetDb->insert('site', $site);
+        $visit = Db::fetchRow('SELECT * FROM log_visit WHERE idsite = ? LIMIT 1', [self::$fixture->idSite]);
+        unset($visit['idvisit']);
+        $visit['idsite'] = $idSite;
+        $visit['visit_first_action_time'] = '2020-01-01 12:00:00';
+        $visit['visit_last_action_time'] = '2020-01-01 12:01:00';
+        $idVisit = $targetDb->insert('log_visit', $visit);
+        $before = $targetDb->fetchRow('SELECT * FROM ' . $targetDb->quoteTable('log_visit') . ' WHERE idvisit = ?', [$idVisit]);
+
+        $this->assertSame(0, $this->runCommand(['--target-idsite' => $idSite, '--end-date' => '2013-12-31']), $this->applicationTester->getDisplay());
+
+        $this->assertSame($before, $targetDb->fetchRow('SELECT * FROM ' . $targetDb->quoteTable('log_visit') . ' WHERE idvisit = ?', [$idVisit]));
+        $this->assertSame('Destination already tracking', $targetDb->fetchOne('SELECT name FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$idSite]));
+        $this->assertStringContainsString('core:invalidate-report-data --sites=' . $idSite, $this->applicationTester->getDisplay());
+        foreach ($this->getPremiumPlugins() as $plugin) {
+            $getData = [$this, 'get' . $plugin . 'Data'];
+            $source = $getData('', self::$fixture->idSite);
+            $target = $getData(self::TARGET_PREFIX, $idSite);
+            foreach ($source as $table => $rows) {
+                if (strpos($table, 'archive_') === 0) {
+                    continue;
+                }
+                $this->assertNotEmpty($rows, $table);
+                $this->assertEquals($rows, $target[$table], $table);
+            }
+        }
+    }
+
     /**
      * The roll-ups a site belongs to are other sites, which test_runMigration_rollUps_aggregateTheSitesTheirSitesWereMigratedTo
      * checks

@@ -61,13 +61,20 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        foreach ($this->extraTables as $table) {
-            Db::query('DROP TABLE IF EXISTS ' . Db::get()->quoteIdentifier([$table]));
+        try {
+            foreach ($this->extraTables as $table) {
+                Db::query('DROP TABLE IF EXISTS ' . Db::get()->quoteIdentifier([$table]));
+            }
+            foreach (['alert', 'alert_site', 'alert_triggered'] as $table) {
+                Db::query('DROP TABLE IF EXISTS ' . $this->targetDb->prefixTable($table));
+            }
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
         }
-        foreach (['alert', 'alert_site', 'alert_triggered'] as $table) {
-            Db::query('DROP TABLE IF EXISTS ' . $this->targetDb->prefixTable($table));
-        }
-        parent::tearDown();
     }
 
     /** @dataProvider getSkipOptions */
@@ -247,6 +254,80 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
         $this->assertStringContainsString('metric', $errors[0]);
     }
 
+    public function test_historyLookupFailureRollsBackAndRemovesTemporaryTable(): void
+    {
+        $this->targetDb = new AlertHistoryPlanDb(['tables_prefix' => 'alerts_target_']);
+        $this->request->isExistingTargetSite = true;
+        $this->createAlert(1, [1]);
+        $this->createHistory(1, 1);
+        $before = $this->allRows(true);
+        $this->targetDb->failHistoryLookup = true;
+        try {
+            (new Migrations())->migrate([new CustomAlertsMigration()], $this->request, $this->targetDb);
+            $this->fail('Expected the simulated history lookup failure.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated history lookup failure', $exception->getMessage());
+        }
+        $this->assertSame($before, $this->allRows(true));
+        $this->assertNotNull($this->targetDb->historyLookup);
+        try {
+            $this->targetDb->fetchOne('SELECT COUNT(*) FROM ' . $this->targetDb->quoteIdentifier($this->targetDb->historyLookup));
+            $this->fail('The connection-local history lookup must be removed on failure.');
+        } catch (\Zend_Db_Statement_Exception $exception) {
+            $this->assertStringContainsString('42S02', $exception->getMessage());
+        }
+        $this->targetDb->failHistoryLookup = false;
+        (new Migrations())->migrate([new CustomAlertsMigration()], $this->request, $this->targetDb);
+        $this->assertCount(1, $this->allRows(true)['alert_triggered'], 'Retrying on the same connection must work.');
+    }
+
+    public function test_existingHistoryUsesIndexedCandidatesAndPreservesNullSnapshots(): void
+    {
+        $this->targetDb = new AlertHistoryPlanDb(['tables_prefix' => 'alerts_target_']);
+        $this->request->isExistingTargetSite = true;
+        $this->createAlert(1, [1]);
+        $this->createHistory(1, 1);
+        Db::query('UPDATE ' . Common::prefixTable('alert_triggered') . ' SET ts_last_sent = NULL, value_old = NULL');
+        // Two identical source snapshots must not become two destination rows.
+        $this->createHistory(1, 1);
+        Db::query('UPDATE ' . Common::prefixTable('alert_triggered') . ' SET ts_last_sent = NULL, value_old = NULL');
+        $unrelated = $this->historyRow($this->alertRow(900, 'Unrelated alert'), 10);
+        $this->targetDb->insert('alert_triggered', $unrelated);
+        $table = $this->targetDb->quoteTable('alert_triggered');
+        $columns = implode(', ', array_map([$this->targetDb, 'quoteIdentifier'], array_keys($unrelated)));
+        for ($i = 0; $i < 11; ++$i) {
+            $this->targetDb->getDb()->query("INSERT INTO $table ($columns) SELECT $columns FROM $table");
+        }
+        $sourceBefore = $this->allRows(false);
+        $indexesBefore = $this->targetDb->fetchAll("SHOW INDEX FROM $table");
+        $this->targetDb->beginTransaction();
+        try {
+            (new CustomAlertsMigration())->migrate($this->request, $this->targetDb);
+            $this->assertTrue($this->targetDb->getDb()->getConnection()->inTransaction(), 'Building the history lookup must not commit migration writes.');
+            (new CustomAlertsMigration())->migrate($this->request, $this->targetDb);
+            $this->assertEquals(2049, $this->targetDb->fetchOne("SELECT COUNT(*) FROM $table"));
+            $copied = $this->targetDb->fetchRow("SELECT * FROM $table WHERE idalert <> 900");
+            $this->assertNull($copied['value_old']);
+            $this->assertNull($copied['ts_last_sent']);
+            $this->assertEquals(2048, $this->targetDb->fetchOne("SELECT COUNT(*) FROM $table WHERE idalert = 900"));
+            $this->assertSame($sourceBefore, $this->allRows(false));
+            $this->assertNotEmpty($this->targetDb->plans);
+            foreach ($this->targetDb->plans as $plan) {
+                $this->assertLessThan(100, array_sum(array_column($plan, 'rows')), 'History lookup must not scan thousands of unrelated snapshots: ' . json_encode($plan));
+            }
+        } finally {
+            $this->targetDb->rollBack();
+        }
+        $this->assertEquals(2048, $this->targetDb->fetchOne("SELECT COUNT(*) FROM $table"), 'All migrated rows must roll back.');
+        // Cardinality estimates can change; compare the permanent index definitions only.
+        $indexColumns = function (array $rows): array {
+            return array_map(function (array $row): array {
+                return array_intersect_key($row, array_flip(['Key_name', 'Column_name', 'Seq_in_index', 'Non_unique']));
+            }, $rows);
+        };
+        $this->assertSame($indexColumns($indexesBefore), $indexColumns($this->targetDb->fetchAll("SHOW INDEX FROM $table")));
+    }
+
     public function test_validateStructureAcceptsMatchingTables()
     {
         $this->assertSame([], (new CustomAlertsMigration())->validateStructure($this->targetDb));
@@ -285,6 +366,88 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
         }
         $this->assertSame($sourceBefore, $this->allRows(false));
         $this->assertSame([], $migrator->getTablesNotMigrated(1, $this->targetDb));
+    }
+
+    /** @dataProvider getDimensionMetricTargets */
+    public function test_dimensionMetricsAreTranslatedBeforeReusingAlertsAndHistory(int $currentDimension, int $historicalDimension, ?string $existing, bool $dryRun): void
+    {
+        $migrator = $this->createPremiumReports();
+        $this->createPremiumAlert(1, [1]);
+        Db::get()->update(Common::prefixTable('alert'), ['metric' => 'nb_uniq_customdimension_customdimension2'], 'idalert = 1');
+        Db::get()->update(Common::prefixTable('alert_triggered'), ['metric' => 'nb_uniq_customdimension_customdimension3'], 'idalert = 1');
+        $this->request->isExistingTargetSite = true;
+        $this->request->idMaps->set(TableDefinition::CUSTOM_DIMENSION, 2, $currentDimension);
+        $this->request->idMaps->set(TableDefinition::CUSTOM_DIMENSION, 3, $historicalDimension);
+        // Reusing the reports makes their destination IDs deterministic in dry runs too.
+        foreach ([101 => 'Current report', 102 => 'Historical report'] as $id => $name) {
+            $this->targetDb->insert('mtest_alert_report', ['idreport' => $id, 'idsite' => 10, 'name' => $name]);
+        }
+        $sourceBefore = $this->allRows(false);
+        $expectedAlert = array_merge($sourceBefore['alert'][0], [
+            'idalert' => 100, 'report' => 'CustomReports_getCustomReport_idCustomReport--101',
+            'metric' => 'nb_uniq_customdimension_customdimension' . $currentDimension,
+        ]);
+        $expectedHistory = array_merge($sourceBefore['alert_triggered'][0], [
+            'idalert' => 100, 'idsite' => 10, 'report' => 'CustomReports_getCustomReport_idCustomReport--102',
+            'metric' => 'nb_uniq_customdimension_customdimension' . $historicalDimension,
+        ]);
+        unset($expectedHistory['idtriggered']);
+        if ($existing !== null) {
+            $alert = $expectedAlert;
+            $history = $expectedHistory;
+            if ($existing === 'conflicting') {
+                $alert['metric'] = 'nb_uniq_customdimension_customdimension2';
+                $history['metric'] = 'nb_uniq_customdimension_customdimension3';
+            }
+            $this->targetDb->insert('alert', $alert);
+            $this->targetDb->insert('alert_site', ['idalert' => 100, 'idsite' => 10]);
+            $this->targetDb->insert('alert_triggered', $history);
+        }
+        $targetBefore = $this->allRows(true);
+        if ($dryRun) {
+            $this->targetDb->enableDryRun();
+        }
+        $messages = [];
+        $alerts = new CustomAlertsMigration($migrator);
+        $alerts->onLog(function ($message) use (&$messages) {
+            $messages[] = $message;
+        });
+        (new Migrations())->migrate([new PluginDataMigration($migrator, true), $alerts], $this->request, $this->targetDb);
+
+        $added = $existing === 'matching' ? 0 : 1;
+        $this->assertContains('Migrated ' . $added . ' custom alerts', $messages);
+        $this->assertContains('Migrated ' . $added . ' triggered custom alerts', $messages);
+        $target = $this->allRows(true);
+        if ($dryRun) {
+            $this->assertSame($targetBefore, $target, 'Dry runs must translate references for reuse decisions without writing.');
+        } else {
+            $this->assertCount(count($targetBefore['alert']) + $added, $target['alert']);
+            $this->assertCount(count($targetBefore['alert_triggered']) + $added, $target['alert_triggered']);
+            $actualAlert = end($target['alert']);
+            $actualHistory = end($target['alert_triggered']);
+            $expectedAlert['idalert'] = $actualAlert['idalert'];
+            $expectedHistory['idalert'] = $actualAlert['idalert'];
+            unset($actualHistory['idtriggered']);
+            $this->assertEquals($expectedAlert, $actualAlert);
+            $this->assertEquals($expectedHistory, $actualHistory, 'History has its own dimension ID, independent of the current alert.');
+            if ($existing !== null) {
+                $this->assertSame($targetBefore['alert'][0], $target['alert'][0], 'The existing destination alert must remain unchanged.');
+                $this->assertSame($targetBefore['alert_triggered'][0], $target['alert_triggered'][0]);
+            }
+        }
+        $this->assertSame($sourceBefore, $this->allRows(false));
+    }
+
+    public static function getDimensionMetricTargets(): array
+    {
+        return [
+            'different current and historical dimensions' => [5, 8, null, false],
+            'identity mappings' => [2, 3, null, false],
+            'reuse translated alert and snapshot' => [5, 8, 'matching', false],
+            'source metric conflicts with destination metric' => [5, 8, 'conflicting', false],
+            'dry run reuses translated alert and snapshot' => [5, 8, 'matching', true],
+            'dry run detects different destination metric' => [5, 8, 'conflicting', true],
+        ];
     }
 
     /** @dataProvider getUnresolvedPremiumReferences */
@@ -462,5 +625,27 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
             $rows[$table] = Db::fetchAll('SELECT * FROM ' . $name . ' ORDER BY ' . $order);
         }
         return $rows;
+    }
+}
+
+/** Captures the real optimizer plan while connection-local lookup tables still exist. */
+class AlertHistoryPlanDb extends TargetDb
+{
+    public $plans = [];
+    public $historyLookup;
+    public $failHistoryLookup = false;
+
+    public function fetchOne($sql, $bind = [])
+    {
+        if (strpos($sql, 'SELECT 1 FROM ' . $this->quoteTable('alert_triggered')) === 0) {
+            $this->plans[] = $this->fetchAll('EXPLAIN ' . $sql, $bind);
+            if (preg_match('/INNER JOIN `(migration_alert_history_[a-f0-9]+)`/', $sql, $matches)) {
+                $this->historyLookup = $matches[1];
+            }
+            if ($this->failHistoryLookup) {
+                throw new \RuntimeException('Simulated history lookup failure');
+            }
+        }
+        return parent::fetchOne($sql, $bind);
     }
 }
