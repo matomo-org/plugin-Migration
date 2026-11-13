@@ -65,12 +65,19 @@ class PluginDataMigratorTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        foreach (array_keys(self::TABLES) as $table) {
-            foreach ([Common::prefixTable($table), self::TARGET_PREFIX . $table] as $prefixedTable) {
-                Db::query(sprintf('DROP TABLE IF EXISTS `%s`', $prefixedTable));
+        try {
+            foreach (array_keys(self::TABLES) as $table) {
+                foreach ([Common::prefixTable($table), self::TARGET_PREFIX . $table] as $prefixedTable) {
+                    Db::query(sprintf('DROP TABLE IF EXISTS `%s`', $prefixedTable));
+                }
             }
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
         }
-        parent::tearDown();
     }
 
     public function test_validate_acceptsTheFeaturesWhereTheyAreSupported()

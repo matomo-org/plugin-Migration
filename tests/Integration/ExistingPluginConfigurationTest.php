@@ -67,11 +67,19 @@ class ExistingPluginConfigurationTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        $this->setSourcePrefix($this->originalPrefix);
-        foreach (array_reverse($this->createdTables) as $table) {
-            Db::query('DROP TABLE IF EXISTS `' . $table . '`');
+        try {
+            $this->setSourcePrefix($this->originalPrefix);
+            foreach (array_reverse($this->createdTables) as $table) {
+                Db::query('DROP TABLE IF EXISTS `' . $table . '`');
+            }
+        } finally {
+            // PHPUnit retains test instances; release the secondary connection explicitly.
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
         }
-        parent::tearDown();
     }
 
     private function setSourcePrefix(string $prefix): void

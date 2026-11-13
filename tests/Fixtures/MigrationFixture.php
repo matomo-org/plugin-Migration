@@ -133,8 +133,15 @@ class MigrationFixture extends Fixture
 
     public function tearDown(): void
     {
-        self::tearDownTargetDbTableStructure($this->targetDb);
-        parent::tearDown();
+        try {
+            self::tearDownTargetDbTableStructure($this->targetDb);
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
+        }
     }
 
     private function setUpWebsite()

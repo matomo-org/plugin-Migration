@@ -61,13 +61,20 @@ class CustomAlertsMigrationTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        foreach ($this->extraTables as $table) {
-            Db::query('DROP TABLE IF EXISTS ' . Db::get()->quoteIdentifier([$table]));
+        try {
+            foreach ($this->extraTables as $table) {
+                Db::query('DROP TABLE IF EXISTS ' . Db::get()->quoteIdentifier([$table]));
+            }
+            foreach (['alert', 'alert_site', 'alert_triggered'] as $table) {
+                Db::query('DROP TABLE IF EXISTS ' . $this->targetDb->prefixTable($table));
+            }
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
         }
-        foreach (['alert', 'alert_site', 'alert_triggered'] as $table) {
-            Db::query('DROP TABLE IF EXISTS ' . $this->targetDb->prefixTable($table));
-        }
-        parent::tearDown();
     }
 
     /** @dataProvider getSkipOptions */

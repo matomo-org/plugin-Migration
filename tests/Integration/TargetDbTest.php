@@ -38,8 +38,15 @@ class TargetDbTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        MigrationFixture::tearDownTargetDbTableStructure($this->targetDb);
-        parent::tearDown();
+        try {
+            MigrationFixture::tearDownTargetDbTableStructure($this->targetDb);
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
+        }
     }
 
     public function test_prefixTable()

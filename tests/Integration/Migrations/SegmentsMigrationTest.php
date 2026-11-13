@@ -70,12 +70,19 @@ class SegmentsMigrationTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        foreach (['mtest_segment_item', 'mtest_segment_report', 'mtest_segment_visit'] as $table) {
-            Db::query('DROP TABLE IF EXISTS `' . Common::prefixTable($table) . '`');
-            Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . $table . '`');
+        try {
+            foreach (['mtest_segment_item', 'mtest_segment_report', 'mtest_segment_visit'] as $table) {
+                Db::query('DROP TABLE IF EXISTS `' . Common::prefixTable($table) . '`');
+                Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . $table . '`');
+            }
+            Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . 'segment`');
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
         }
-        Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . 'segment`');
-        parent::tearDown();
     }
 
     public function test_copyToSite_quotesTargetPrefixWhenReusingSegments(): void
