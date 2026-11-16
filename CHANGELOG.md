@@ -1,6 +1,6 @@
 ## Changelog
 
-### 6.1.0
+### 6.1.0 - 2026-11-16
 - Added migration of premium-plugin data for a website, including plugin configuration, raw data and references in historical reports, with validation of encrypted search-engine settings, roll-up mappings scoped to source database endpoints, and custom-metric name and cross-site reference handling
 - Translate premium-report references and custom-metric IDs in custom alerts and triggered history after migrating plugin data
 - Prepare destination archive tables before copying data so later failures can roll back the migration
