@@ -65,7 +65,7 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
         ];
     }
 
-    private function runCommand(array $options = [])
+    private function runCommand(array $options = [], bool $interactive = false)
     {
         $config = Db::getDatabaseConfig();
         $result = $this->applicationTester->run(array_merge([
@@ -76,8 +76,8 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
             '--target-db-password' => $config['password'],
             '--target-db-name' => $config['dbname'],
             '--target-db-prefix' => MigrationFixture::TARGET_DB_PREFIX,
-            '--no-interaction' => true,
-        ], $options));
+            '--no-interaction' => !$interactive,
+        ], $options), ['interactive' => $interactive]);
         return $result;
     }
 
@@ -294,7 +294,7 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
         $result = $this->runCommand(array_merge($options, ['--dry-run' => true]));
         $output = $this->applicationTester->getDisplay();
         $this->assertEquals(0, $result, $output);
-        $this->assertStringContainsString('--dates=2012-12-31,2012-12-31 --periods=day', $output);
+        $this->assertStringContainsString('--sites=<new site ID> --dates=2012-12-31,2012-12-31 --periods=day', $output);
         $this->assertEquals($sitesBefore, $targetDb->fetchOne('SELECT COUNT(*) FROM ' . $targetDb->prefixTable('site')));
 
         $result = $this->runCommand($options);
@@ -459,6 +459,32 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
         $this->assertSame(0, $this->getTargetSiteCounts($idSite)['archives']);
         $this->assertStringContainsString('--target-site-is-offline', $this->applicationTester->getDisplay());
         $this->assertStringContainsString('core:invalidate-report-data', $this->applicationTester->getDisplay());
+    }
+
+    public function test_decliningAfterArchiveWarningLeavesTheSiteEmpty(): void
+    {
+        $idSite = $this->createTargetSite('Empty destination', 'UTC');
+        $before = $this->getTargetSiteCounts($idSite);
+        $this->applicationTester->setInputs(['no']);
+        $this->assertSame(0, $this->runCommand(['--target-idsite' => $idSite], true));
+        $output = $this->applicationTester->getDisplay();
+        $this->assertStringContainsString('Are you sure you want to migrate', $output);
+        $beforePrompt = explode('Are you sure you want to migrate', $output, 2)[0];
+        $this->assertStringContainsString('Warning: Reports will not be copied', $beforePrompt);
+        $this->assertStringContainsString('--target-site-is-offline', $beforePrompt);
+        $this->assertStringNotContainsString('Processing SiteMigration', $output);
+        $this->assertSame($before, $this->getTargetSiteCounts($idSite));
+    }
+
+    public function test_dryRunShowsTheSiteIdAvailableForRebuildingReports(): void
+    {
+        $options = ['--skip-archives' => true, '--dry-run' => true];
+        $this->assertSame(0, $this->runCommand($options));
+        $this->assertStringContainsString('core:invalidate-report-data --sites=<new site ID> --dates=', $this->applicationTester->getDisplay());
+
+        $idSite = $this->createTargetSite('Existing destination', 'UTC');
+        $this->assertSame(0, $this->runCommand($options + ['--target-idsite' => $idSite]));
+        $this->assertStringContainsString('core:invalidate-report-data --sites=' . $idSite . ' --dates=', $this->applicationTester->getDisplay());
     }
 
     public function test_archiveOnlyImportRequiresOfflineAssertionBeforeWriting(): void
@@ -760,7 +786,7 @@ class MigrateExistingSiteTest extends ConsoleCommandTestCase
             $this->assertSame($utcRange, $request->getUtcDateTimeRange());
             $this->assertSame(0, $this->runCommand(['--start-date' => $start, '--end-date' => $end, '--dry-run' => true]), $this->applicationTester->getDisplay());
             $output = preg_replace('/\s+/', ' ', $this->applicationTester->getDisplay());
-            preg_match_all('/core:invalidate-report-data --sites=\d+ --dates=([\d,-]+) --periods=([a-z,]+)/', $output, $matches, PREG_SET_ORDER);
+            preg_match_all('/core:invalidate-report-data --sites=<new site ID> --dates=([\d,-]+) --periods=([a-z,]+)/', $output, $matches, PREG_SET_ORDER);
             $actual = array_map(function (array $match): array {
                 return [$match[1], $match[2]];
             }, $matches);

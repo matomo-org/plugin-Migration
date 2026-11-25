@@ -131,7 +131,7 @@ class Migrate extends ConsoleCommand
                     . '"./console core:invalidate-report-data --sites=%s --dates=%s,%s" and "./console core:archive". '
                     . 'Before rebuilding, ensure the destination has the retained raw data from both instances for the affected periods. '
                     . 'Rebuilding can replace existing historical totals with incomplete data if either instance purged its raw data.',
-                    $request->targetIdSite,
+                    $this->getSiteIdForRebuildCommand($request),
                     $firstDay,
                     $lastDay
                 ));
@@ -252,6 +252,10 @@ class Migrate extends ConsoleCommand
             return $warnings;
         }
 
+        if ($request->archivesNotCopiedReason !== null && !$this->getInput()->getOption('skip-archives')) {
+            $warnings[] = 'Reports will not be copied because ' . $request->archivesNotCopiedReason . '.';
+        }
+
         $sourceSite = Db::fetchRow('SELECT * FROM `' . \Piwik\Common::prefixTable('site') . '` WHERE idsite = ?', [$request->sourceIdSite]);
         $targetSite = $targetDb->fetchRow('SELECT * FROM ' . $targetDb->quoteTable('site') . ' WHERE idsite = ?', [$request->targetIdSite]);
         if ($sourceSite['ecommerce'] != $targetSite['ecommerce'] || $sourceSite['currency'] !== $targetSite['currency']) {
@@ -330,6 +334,14 @@ class Migrate extends ConsoleCommand
         return (string) $value;
     }
 
+    private function getSiteIdForRebuildCommand(Request $request): string
+    {
+        if ($this->getInput()->getOption('dry-run') && !$request->isExistingTargetSite) {
+            return '<new site ID>';
+        }
+        return (string) $request->targetIdSite;
+    }
+
     private function explainDateRangeReports(Request $request, TargetDb $targetDb): void
     {
         if ($this->getInput()->getOption('skip-logs')) {
@@ -353,7 +365,7 @@ class Migrate extends ConsoleCommand
                 $this->logMessage(sprintf(
                     'Note: Migrated visits have actions before --start-date. To process their daily reports on the target Matomo, execute there '
                     . '"./console core:invalidate-report-data --sites=%s --dates=%s,%s --periods=day" and "./console core:archive".',
-                    $request->targetIdSite,
+                    $this->getSiteIdForRebuildCommand($request),
                     $firstDay,
                     $beforeStart
                 ));
@@ -390,7 +402,7 @@ class Migrate extends ConsoleCommand
                 'Note: To process excluded report periods on the target Matomo, execute there '
                 . '"./console core:invalidate-report-data --sites=%s --dates=%s --periods=%s" and "./console core:archive". '
                 . 'Complete copied periods are kept; excluded periods can only include retained raw data and copied subperiod reports.',
-                $request->targetIdSite,
+                $this->getSiteIdForRebuildCommand($request),
                 $dates,
                 implode(',', $periods)
             ));
