@@ -36,7 +36,7 @@ abstract class BaseMigration
      * Prepares schema before the runner starts the transaction that copies site data.
      * Creating tables inside that transaction would implicitly commit earlier writes.
      */
-    public function prepare(TargetDb $targetDb): void
+    public function prepare(Request $request, TargetDb $targetDb): void
     {
     }
 
@@ -73,7 +73,10 @@ abstract class BaseMigration
         if (!empty($diff)) {
             $errors[] = sprintf('The following columns are missing in the target DB table "%s": %s', $targetTable, implode(', ', $diff));
         } else {
-            $diff = array_diff($targetColumnNames, $columnNames);
+            // the rows are inserted with the source columns only, so a column only the target has gets its default value
+            $diff = array_filter(array_diff($targetColumnNames, $columnNames), function ($column) use ($targetColumns) {
+                return !$this->hasDefaultValue($targetColumns[$column]);
+            });
             if (!empty($diff)) {
                 $errors[] = sprintf('The following columns are missing in the source DB table "%s": %s', $sourceTable, implode(', ', $diff));
             }
@@ -113,5 +116,27 @@ abstract class BaseMigration
     public function onLog($callback)
     {
         $this->callback = $callback;
+    }
+
+    public function getWarnings(Request $request, TargetDb $targetDb): array
+    {
+        return [];
+    }
+
+    protected function isDuplicateEntryError(\Exception $e): bool
+    {
+        // not only the SQLSTATE 23000, which is also used for other constraint violations, eg NULL values
+        return strpos($e->getMessage(), 'Duplicate entry') !== false
+            || strpos($e->getMessage(), ' 1062 ') !== false;
+    }
+
+    /** @param array<string, mixed> $column */
+    private function hasDefaultValue(array $column): bool
+    {
+        $extra = strtolower((string) ($column['Extra'] ?? ''));
+        return ($column['Null'] ?? '') === 'YES'
+            || $column['Default'] !== null
+            || strpos($extra, 'auto_increment') !== false
+            || strpos($extra, 'generated') !== false;
     }
 }

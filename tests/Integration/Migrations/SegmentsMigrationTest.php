@@ -70,12 +70,19 @@ class SegmentsMigrationTest extends IntegrationTestCase
 
     public function tearDown(): void
     {
-        foreach (['mtest_segment_item', 'mtest_segment_report', 'mtest_segment_visit'] as $table) {
-            Db::query('DROP TABLE IF EXISTS `' . Common::prefixTable($table) . '`');
-            Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . $table . '`');
+        try {
+            foreach (['mtest_segment_item', 'mtest_segment_report', 'mtest_segment_visit'] as $table) {
+                Db::query('DROP TABLE IF EXISTS `' . Common::prefixTable($table) . '`');
+                Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . $table . '`');
+            }
+            Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . 'segment`');
+        } finally {
+            if ($this->targetDb !== null) {
+                $this->targetDb->getDb()->closeConnection();
+                $this->targetDb = null;
+            }
+            parent::tearDown();
         }
-        Db::query('DROP TABLE IF EXISTS `' . self::TARGET_PREFIX . 'segment`');
-        parent::tearDown();
     }
 
     public function test_copyToSite_quotesTargetPrefixWhenReusingSegments(): void
@@ -193,7 +200,7 @@ class SegmentsMigrationTest extends IntegrationTestCase
     }
 
     /** @dataProvider getDeletedSegmentCases */
-    public function test_deletedPluginSegmentsDoNotBlockMigration(bool $global, bool $dryRun, bool $skipPlugin, bool $hasItem, bool $encoded): void
+    public function test_deletedPluginSegmentsDoNotBlockMigration(bool $global, bool $dryRun, bool $skipPlugin, bool $hasItem, bool $encoded, bool $existingSite = false): void
     {
         if ($hasItem) {
             $this->insertSource('mtest_segment_item', ['iditem' => 79, 'idsite' => 1, 'name' => 'Source item']);
@@ -222,8 +229,9 @@ class SegmentsMigrationTest extends IntegrationTestCase
             $this->targetDb->enableDryRun();
         }
         $request = $this->request();
+        $request->isExistingTargetSite = $existingSite;
         $migrator = new PluginDataMigrator($definitions, $skipPlugin ? ['Migration'] : []);
-        (new Migrations())->migrate([new SegmentsMigration(), new PluginDataMigration($migrator, false)], $request, $this->targetDb);
+        (new Migrations())->migrate([new SegmentsMigration($migrator), new PluginDataMigration($migrator, false)], $request, $this->targetDb);
 
         $this->assertSame($sourceBefore, Db::fetchAll('SELECT * FROM ' . Common::prefixTable('segment') . ' ORDER BY idsegment'));
         $this->assertNotNull($request->idMaps->get(TableDefinition::SEGMENT, 100));
@@ -243,7 +251,7 @@ class SegmentsMigrationTest extends IntegrationTestCase
 
     public static function getDeletedSegmentCases(): array
     {
-        return [
+        $cases = [
             'missing site item' => [false, false, false, false, false],
             'missing site item dry run' => [false, true, false, false, false],
             'missing global item' => [true, false, false, false, false],
@@ -255,6 +263,10 @@ class SegmentsMigrationTest extends IntegrationTestCase
             'mapped site item stays deleted' => [false, false, false, true, false],
             'mapped global item stays deleted' => [true, false, false, true, false],
         ];
+        foreach ($cases as $name => $arguments) {
+            $cases['existing target: ' . $name] = array_merge($arguments, [true]);
+        }
+        return $cases;
     }
 
     public function test_visitBatchKeepsSiteSegmentMappingAfterCopyingGlobalSegment(): void

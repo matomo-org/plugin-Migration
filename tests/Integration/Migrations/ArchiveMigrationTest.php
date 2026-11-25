@@ -72,13 +72,13 @@ class ArchiveMigrationTest extends IntegrationTestCase
         $this->assertContains($targetDb->prefixTable('archive_numeric_2098_12'), $installed);
         $this->assertContains($targetDb->prefixTable('sequence'), $installed);
 
-        $migration = new ArchiveMigration();
-        $migration->prepare($targetDb);
-        $this->assertSame($beforeTables, Db::get()->fetchCol('SHOW TABLES'), 'Preparation must not create copies of destination tables.');
-
         $request = new Request();
         $request->sourceIdSite = 1;
         $request->targetIdSite = 2;
+
+        $migration = new ArchiveMigration();
+        $migration->prepare($request, $targetDb);
+        $this->assertSame($beforeTables, Db::get()->fetchCol('SHOW TABLES'), 'Preparation must not create copies of destination tables.');
         (new Migrations())->migrate([$migration], $request, $targetDb);
 
         $this->assertSame($sourceBefore, Db::fetchAll('SELECT * FROM ' . $this->quote($sourceTable)));

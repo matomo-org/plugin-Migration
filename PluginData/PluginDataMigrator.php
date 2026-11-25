@@ -70,6 +70,21 @@ class PluginDataMigrator
     /** @var array<string, array<int|string, true>> source rows replaced by a site-specific row */
     private $deduplicatedRowIds = [];
 
+    /** @var bool */
+    private $existingConfigurationDiffers = false;
+
+    /** @var array<array{table: string, column: string, sourceId: int|string, targetValue: mixed}> */
+    private $existingConfigurationReferences = [];
+
+    /** @var array<string, array<int|string, true>> destination configuration rows reused, by table and ID */
+    private $reusedConfigurationIds = [];
+
+    /** @var array<string, array<int|string, true>> rows inserted during this migration, which are not existing configuration */
+    private $addedConfigurationIds = [];
+
+    /** @var array<int|string, array<string, true>> distinct existing children matched in the current table, by parent ID */
+    private $matchedConfigurationChildren = [];
+
     /**
      * @var array<string, array<string, array<string, mixed>>> table => column => definition as in SHOW COLUMNS
      */
@@ -102,6 +117,9 @@ class PluginDataMigrator
      * @var int|null
      */
     private $targetIdSite;
+
+    /** @var int|null */
+    private $existingTargetIdSite;
 
     /**
      * @var int
@@ -639,13 +657,43 @@ class PluginDataMigrator
     {
         $maps = $request->idMaps;
         $resolver = new IdResolver($maps, $this, new LogActionMigration(), $targetDb);
+        $this->existingTargetIdSite = $request->isExistingTargetSite ? (int) $request->targetIdSite : null;
+        $this->existingConfigurationDiffers = false;
+        $this->existingConfigurationReferences = [];
+        $this->reusedConfigurationIds = [];
+        $this->addedConfigurationIds = [];
         $this->targetIdSite = (int) $request->targetIdSite;
 
         $counts = [];
-        foreach ($this->getTablesOfPhase(self::PHASE_SITE) as $tableDefinition) {
-            $counts[$tableDefinition->getTable()] = $this->copyRows($tableDefinition, $maps, $resolver, $targetDb);
+        try {
+            foreach ($this->getTablesOfPhase(self::PHASE_SITE) as $tableDefinition) {
+                $counts[$tableDefinition->getTable()] = $this->copyRows($tableDefinition, $maps, $resolver, $targetDb);
+            }
+            $this->checkExistingConfigurationReferences($request);
+        } finally {
+            // visit data is always new
+            $this->existingTargetIdSite = null;
+            $this->existingConfigurationReferences = [];
+            $this->reusedConfigurationIds = [];
+            $this->addedConfigurationIds = [];
+            $this->matchedConfigurationChildren = [];
         }
         return $counts;
+    }
+
+    private function checkExistingConfigurationReferences(Request $request): void
+    {
+        // Own-table references may point to a row later in the copy order. Compare them only once all IDs
+        // are known, so different source/target IDs alone do not make an equivalent definition a conflict.
+        foreach ($this->existingConfigurationReferences as $reference) {
+            $expected = $request->idMaps->get($reference['table'], $reference['sourceId']) ?? $this->getEmptyValue($reference['table'], $reference['column']);
+            if (!$this->sameConfigurationValue($expected, $reference['targetValue'])) {
+                $this->existingConfigurationDiffers = true;
+            }
+        }
+        if ($this->existingConfigurationDiffers && $request->archivesNotCopiedReason === null) {
+            $request->archivesNotCopiedReason = 'existing premium configuration differs from the source definitions, so copied reports would not match the destination settings';
+        }
     }
 
     /**
@@ -703,6 +751,7 @@ class PluginDataMigrator
         $parentColumn = (string) $tableDefinition->getParentColumn();
         $idColumn = $tableDefinition->getIdColumn();
         $columns = $this->getSourceColumns($table);
+        $this->matchedConfigurationChildren = [];
 
         $counts = ['migrated' => 0, 'skipped' => 0, 'existing' => 0, 'duplicate' => 0];
         $parentIds = array_keys($maps->getAll($parentTable));
@@ -736,6 +785,7 @@ class PluginDataMigrator
             }
         }
         $this->setOwnTableReferences($tableDefinition, $maps, $targetDb);
+        $this->checkExistingConfigurationChildren($tableDefinition, $targetDb);
 
         return $counts;
     }
@@ -786,6 +836,38 @@ class PluginDataMigrator
             return 'skipped';
         }
 
+        if ($this->existingTargetIdSite !== null) {
+            $parentTable = (string) $tableDefinition->getParentTable();
+            $parentId = $targetRow[(string) $tableDefinition->getParentColumn()] ?? null;
+            $hasExistingParent = $parentId !== null && isset($this->reusedConfigurationIds[$parentTable][$parentId]);
+            $existing = $this->findExistingRow($tableDefinition, $targetRow, $targetDb);
+            if ($existing !== null) {
+                if ($idColumn !== null) {
+                    $existingId = $this->toId($existing[$idColumn]);
+                    $maps->set($table, $this->toId($row[$idColumn]), $existingId);
+                    if (!isset($this->addedConfigurationIds[$table][$existingId])) {
+                        $this->reusedConfigurationIds[$table][$existingId] = true;
+                    }
+                }
+                if ($hasExistingParent) {
+                    // Count distinct destination identities, not source rows: multiple source rows can reuse one.
+                    $identity = array_intersect_key($existing, array_flip($tableDefinition->getIdentityColumns()));
+                    $this->matchedConfigurationChildren[$parentId][serialize($identity)] = true;
+                }
+                $this->compareExistingConfiguration($tableDefinition, $targetRow, $existing);
+                return 'existing';
+            }
+            if ($hasExistingParent) {
+                throw new \RuntimeException(sprintf(
+                    'Cannot migrate %s: a source child has no matching row under existing destination %s ID %s. '
+                    . 'Adding it would change the destination plugin configuration. Align the definitions or exclude the affected plugin with --skip-plugin-data before retrying.',
+                    $table,
+                    $parentTable,
+                    $parentId
+                ));
+            }
+        }
+
         if ($autoIncrementColumn !== null) {
             unset($targetRow[$autoIncrementColumn]);
         } elseif ($uniqueKeyColumn !== null) {
@@ -807,6 +889,9 @@ class PluginDataMigrator
         } elseif ($uniqueKeyColumn !== null) {
             $targetId = $this->toId($targetRow[$uniqueKeyColumn]);
             $maps->set($table, $this->toId($row[$uniqueKeyColumn]), $targetId);
+        }
+        if ($this->existingTargetIdSite !== null && $idColumn !== null) {
+            $this->addedConfigurationIds[$table][$targetId] = true;
         }
         foreach ($ownTableReferences as $column => $sourceId) {
             $this->pendingOwnTableReferences[] = ['id' => $targetId, 'column' => $column, 'sourceId' => $sourceId];
@@ -832,6 +917,10 @@ class PluginDataMigrator
             $idColumn = (string) $tableDefinition->getAutoIncrementColumn();
             $where = sprintf('%s = ?', $this->quoteIdentifier((string) $tableDefinition->getParentColumn()));
             $bind = [$request->sourceIdSite];
+            if ($request->hasDateRange()) {
+                $where .= sprintf(' AND %s BETWEEN ? AND ?', $this->quoteIdentifier((string) $tableDefinition->getTimeColumn()));
+                $bind = array_merge($bind, $request->getUtcDateTimeRange());
+            }
             $columns = $this->getSourceColumns($table);
             $tableCounts = ['migrated' => 0, 'skipped' => 0, 'existing' => 0, 'duplicate' => 0, 'present' => 0];
 
@@ -886,6 +975,20 @@ class PluginDataMigrator
             do {
                 $sql = sprintf('SELECT * FROM %s WHERE %s', $sourceTable, $where);
                 $bind = [$key];
+                $dateConditions = [];
+                $dateColumn = $this->quoteIdentifier((string) $tableDefinition->getDateColumn());
+                foreach (['>=' => $request->startDate, '<=' => $request->endDate] as $operator => $date) {
+                    if ($date !== null) {
+                        $dateConditions[] = sprintf('%s %s ?', $dateColumn, $operator);
+                        $bind[] = $date;
+                    }
+                }
+                if ($dateConditions !== []) {
+                    // Current property data (eg Bing crawl errors) has no reporting day. Keep it regardless of
+                    // which bound was supplied; the ordinary primary-key check still preserves destination rows.
+                    // Numeric zero also works when MySQL rejects a zero-date string under NO_ZERO_DATE.
+                    $sql .= sprintf(' AND ((%s) OR %s = 0)', implode(' AND ', $dateConditions), $dateColumn);
+                }
                 if ($lastRow !== null) {
                     $sql .= sprintf(' AND (%s) > (%s)', $pageColumnList, Common::getSqlStringFieldsArray($pageColumns));
                     foreach ($pageColumns as $column) {
@@ -969,6 +1072,58 @@ class PluginDataMigrator
         /** @var array<string, mixed>|false $row */
         $row = $targetDb->fetchRow(sprintf('SELECT * FROM %s t WHERE %s LIMIT 1', $targetTable, implode(' AND ', $where)), $bind);
         return is_array($row) && !empty($row) ? $row : null;
+    }
+
+    /**
+     * @param array<string, mixed> $sourceRow transformed source values, except deferred own-table references
+     * @param array<string, mixed> $existingRow the matching destination definition, which is preserved
+     */
+    private function compareExistingConfiguration(TableDefinition $definition, array $sourceRow, array $existingRow): void
+    {
+        $ownReferences = $definition->getOwnTableReferences();
+        foreach ($sourceRow as $column => $value) {
+            if ($column === $definition->getIdColumn()) {
+                continue;
+            }
+            if (
+                array_key_exists($column, $ownReferences) && $value !== null && $value !== '' && $value !== '0' && $value !== 0
+                && ($ownReferences[$column] === null || $ownReferences[$column]($sourceRow))
+            ) {
+                $this->existingConfigurationReferences[] = ['table' => $definition->getTable(), 'column' => $column,
+                    'sourceId' => $this->toId($value), 'targetValue' => $existingRow[$column] ?? null];
+            } elseif (!$this->sameConfigurationValue($value, $existingRow[$column] ?? null)) {
+                $this->existingConfigurationDiffers = true;
+            }
+        }
+    }
+
+    private function checkExistingConfigurationChildren(TableDefinition $definition, TargetDb $targetDb): void
+    {
+        $parentIds = array_keys($this->reusedConfigurationIds[(string) $definition->getParentTable()] ?? []);
+        $parentColumn = $targetDb->quoteIdentifier((string) $definition->getParentColumn());
+        foreach (array_chunk($parentIds, self::PARENT_IDS_PER_QUERY) as $ids) {
+            $rows = $targetDb->fetchAll(
+                'SELECT ' . $parentColumn . ' AS parent_id, COUNT(*) AS num_rows FROM ' . $targetDb->quoteTable($definition->getTable())
+                . ' WHERE ' . $parentColumn . ' IN (' . Common::getSqlStringFieldsArray($ids) . ') GROUP BY ' . $parentColumn,
+                $ids
+            );
+            foreach ($rows as $row) {
+                // A destination-only child is part of its definition too, even though no source row visits it.
+                if ((int) $row['num_rows'] !== count($this->matchedConfigurationChildren[$row['parent_id']] ?? [])) {
+                    $this->existingConfigurationDiffers = true;
+                }
+            }
+        }
+        $this->matchedConfigurationChildren = [];
+    }
+
+    /**
+     * @param mixed $sourceValue
+     * @param mixed $targetValue
+     */
+    private function sameConfigurationValue($sourceValue, $targetValue): bool
+    {
+        return $sourceValue === null || $targetValue === null ? $sourceValue === $targetValue : (string) $sourceValue === (string) $targetValue;
     }
 
     /**

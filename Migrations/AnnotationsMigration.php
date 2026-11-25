@@ -31,6 +31,25 @@ class AnnotationsMigration extends BaseMigration
         return [];
     }
 
+    private function migrateAnnotationsIntoExistingSite(Request $request, TargetDb $targetDb): void
+    {
+        $annotations = \Piwik\Db::fetchAll('SELECT * FROM ' . Common::prefixTable('annotations') . ' WHERE idsite = ?', array($request->sourceIdSite));
+        $numAdded = 0;
+        foreach ($annotations as $annotation) {
+            $exists = $targetDb->fetchOne(
+                'SELECT 1 FROM ' . $targetDb->quoteTable('annotations') . ' WHERE idsite = ? AND `date` = ? AND note = ?',
+                array($request->targetIdSite, $annotation['date'], $annotation['note'])
+            );
+            if (!$exists) {
+                unset($annotation['id']);
+                $annotation['idsite'] = $request->targetIdSite;
+                $targetDb->insert('annotations', $annotation);
+                $numAdded++;
+            }
+        }
+        $this->log(sprintf('Found %s annotations, added %s annotations the existing site did not have', count($annotations), $numAdded));
+    }
+
     /**
      * @param Request $request
      * @param TargetDb $targetDb
@@ -41,9 +60,17 @@ class AnnotationsMigration extends BaseMigration
         // since Matomo 5.5.0, annotations are stored in their own table
         // and the AnnotationList class had been removed
         if (!class_exists(AnnotationList::class)) {
-            $this->migrateEntities($request, $targetDb, 'annotations', 'annotations', 'id');
+            if ($request->isExistingTargetSite) {
+                $this->migrateAnnotationsIntoExistingSite($request, $targetDb);
+            } else {
+                $this->migrateEntities($request, $targetDb, 'annotations', 'annotations', 'id');
+            }
 
             return;
+        }
+
+        if ($request->isExistingTargetSite) {
+            throw new \Exception('Migrating into an existing site requires Matomo 5.5.0 or newer.');
         }
 
         // before Matomo 5.5.0, annotations were stored in the options table

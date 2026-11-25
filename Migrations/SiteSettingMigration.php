@@ -20,6 +20,10 @@ class SiteSettingMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
+        if ($request->isExistingTargetSite) {
+            $this->log('The existing site keeps its site settings');
+            return;
+        }
         $this->migrateEntities($request, $targetDb, 'site_setting', 'site settings', 'idsite_setting');
     }
 }

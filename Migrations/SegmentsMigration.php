@@ -9,12 +9,23 @@
 
 namespace Piwik\Plugins\Migration\Migrations;
 
+use Piwik\Common;
+use Piwik\Db;
 use Piwik\Plugins\Migration\PluginData\IdMaps;
+use Piwik\Plugins\Migration\PluginData\PluginDataMigrator;
 use Piwik\Plugins\Migration\PluginData\TableDefinition;
 use Piwik\Plugins\Migration\TargetDb;
 
 class SegmentsMigration extends BaseMigration
 {
+    /** @var array<string, string> */
+    private $pluginSegmentTables;
+
+    public function __construct(?PluginDataMigrator $pluginDataMigrator = null)
+    {
+        $this->pluginSegmentTables = $pluginDataMigrator === null ? [] : $pluginDataMigrator->getSegmentTables();
+    }
+
     public function validateStructure(TargetDb $targetDb)
     {
         return $this->checkTablesHaveSameStructure($targetDb, 'segment');
@@ -22,8 +33,30 @@ class SegmentsMigration extends BaseMigration
 
     public function migrate(Request $request, TargetDb $targetDb)
     {
-        $this->migrateEntities($request, $targetDb, 'segment', 'segments', 'idsegment', 'enable_only_idsite');
-        $request->copiedSegmentIds = array_values($request->idMaps->getAll('segment'));
+        if (!$request->isExistingTargetSite) {
+            $this->migrateEntities($request, $targetDb, 'segment', 'segments', 'idsegment', 'enable_only_idsite');
+            $request->copiedSegmentIds = array_values($request->idMaps->getAll('segment'));
+            return;
+        }
+
+        $sourceSegments = Db::fetchAll('SELECT * FROM ' . Common::prefixTable('segment') . ' WHERE enable_only_idsite = ?', array($request->sourceIdSite));
+        $numAdded = 0;
+        foreach ($sourceSegments as $segment) {
+            [$targetId, $isAdded] = self::copyToSite(
+                $segment,
+                (int) $request->targetIdSite,
+                $request->idMaps,
+                $targetDb,
+                [(int) $request->targetIdSite],
+                $this->pluginSegmentTables
+            );
+            $request->idMaps->set('segment', $segment['idsegment'], $targetId);
+            if ($isAdded) {
+                $request->copiedSegmentIds[] = $targetId;
+                $numAdded++;
+            }
+        }
+        $this->log(sprintf('Found %s segments, added %s segments the existing site did not have', count($sourceSegments), $numAdded));
     }
 
     /**
